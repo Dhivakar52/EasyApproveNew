@@ -46,6 +46,76 @@
   const DOMAIN_TEXT = CONFIG.APPROVED_DOMAINS.map(d => '@' + d).join(' or ');
   const DAY = 864e5;
 
+  const approversByGroup = {
+    "SRM Hospital": [
+      {
+        name: "Dr. Arun Kumar",
+        email: "arun.kumar.hospital@example.com"
+      },
+      {
+        name: "Dr. Priya Nair",
+        email: "priya.nair.hospital@example.com"
+      }
+    ],
+
+    "SRM University": [
+      {
+        name: "Priya Raman",
+        email: "priya.raman.university@example.com"
+      },
+      {
+        name: "Sanjay Kumar",
+        email: "sanjay.kumar.university@example.com"
+      }
+    ],
+
+    "Global Holdings": [
+      {
+        name: "Rajesh Menon",
+        email: "rajesh.menon.global@example.com"
+      },
+      {
+        name: "Ananya Shah",
+        email: "ananya.shah.global@example.com"
+      }
+    ],
+
+    "SRM Tech": [
+      {
+        name: "Karthik Subramanian",
+        email: "karthik.subramanian@srmtech.com"
+      },
+      {
+        name: "Vignesh Raj",
+        email: "vignesh.raj@srmtech.com"
+      }
+    ],
+
+    "Puthiya Thalaimurai": [
+      {
+        name: "Suresh Balaji",
+        email: "suresh.balaji.pt@example.com"
+      },
+      {
+        name: "Divya Mohan",
+        email: "divya.mohan.pt@example.com"
+      }
+    ],
+
+    "SRM MHS": [
+      {
+        name: "Meena Krishnan",
+        email: "meena.krishnan.mhs@example.com"
+      },
+      {
+        name: "Ravi Shankar",
+        email: "ravi.shankar.mhs@example.com"
+      }
+    ]
+  };
+
+  const GROUPS = Object.keys(approversByGroup);
+
   const KEYS = {
     users: 'srm_ap_users',
     requests: 'srm_ap_requests',
@@ -388,6 +458,7 @@
   const state = {
     sessionEmail: null,
     sessionVertical: '',
+    pendingLogin: null,
     actingApprover: null,
     navState: { page: 'dashboard' },
     activeMenuBtn: null,
@@ -424,6 +495,40 @@
     state.sessionEmail = null;
     state.actingApprover = null;
     try { localStorage.removeItem(KEYS.session); } catch (e) { /* ignore */ }
+  }
+
+  function showOtpScreen(email) {
+    const credPanel = $('#login-credentials-panel');
+    const otpPanel = $('#login-otp-panel');
+    if (credPanel) credPanel.classList.add('hidden');
+    if (otpPanel) otpPanel.classList.remove('hidden');
+    const targetEmail = $('#otp-target-email');
+    if (targetEmail) targetEmail.textContent = email;
+    const otpErr = $('#otp-error');
+    if (otpErr) {
+      otpErr.classList.add('hidden');
+      otpErr.textContent = '';
+    }
+    const otpInput = $('#login-otp');
+    if (otpInput) {
+      otpInput.value = '';
+      setTimeout(() => otpInput.focus(), 50);
+    }
+  }
+
+  function showCredentialsScreen() {
+    state.pendingLogin = null;
+    const credPanel = $('#login-credentials-panel');
+    const otpPanel = $('#login-otp-panel');
+    if (otpPanel) otpPanel.classList.add('hidden');
+    if (credPanel) credPanel.classList.remove('hidden');
+    const otpErr = $('#otp-error');
+    if (otpErr) {
+      otpErr.classList.add('hidden');
+      otpErr.textContent = '';
+    }
+    const otpInput = $('#login-otp');
+    if (otpInput) otpInput.value = '';
   }
 
   /* =======================================================
@@ -470,7 +575,7 @@
     const req = {
       id: 'r_' + uid(), number: number, baseNumber: number, numberHistory: [],
       title: d.title, type: d.type, amount: Number(d.amount), budgeted: d.budgeted, amountBudgeted: Number(d.amountBudgeted) || 0, extraReason: d.extraReason || '',
-      requesterName: d.requesterName, requesterEmail: d.requesterEmail, vertical: d.vertical || '', ccEmail: d.ccEmail || '',
+      requesterName: d.requesterName, requesterEmail: d.requesterEmail, group: d.group || '', vertical: d.vertical || '', ccEmail: d.ccEmail || '',
       approverEmail: d.approverEmail, approverName: d.approverName, deadline: d.deadline, stakeholders: d.stakeholders || [],
       details: d.details, reason: d.reason, attachments: d.attachments || [],
       status: 'Pending', version: 1, revisions: {}, reassignCount: 0, reassignments: [],
@@ -481,8 +586,8 @@
     addTimeline(req, actor, 'Request submitted', 'Submitted into approval chain. The request record is locked.');
     notifyRequest(req, 'submitted', e =>
       e === req.requesterEmail ? 'Approval request submitted: ' + req.title + ' (' + req.number + ').' :
-      e === req.approverEmail ? 'New action required: ' + req.title + ' (' + req.number + ') from ' + req.requesterName + '. Deadline: ' + fmtDate(req.deadline) + '.' :
-      'You were added as a stakeholder on ' + req.number + ': ' + req.title + '.');
+        e === req.approverEmail ? 'New action required: ' + req.title + ' (' + req.number + ') from ' + req.requesterName + '. Deadline: ' + fmtDate(req.deadline) + '.' :
+          'You were added as a stakeholder on ' + req.number + ': ' + req.title + '.');
     persist();
     return req;
   }
@@ -491,7 +596,7 @@
     addTimeline(req, actor, 'Approver reminder triggered', 'High-priority notification sent to ' + req.approverEmail + '.');
     notifyRequest(req, 'reminder', e =>
       e === req.approverEmail ? 'Reminder from ' + req.requesterName + ': ' + req.number + ' requires your sign-off before ' + fmtDate(req.deadline) + '.' :
-      e === req.requesterEmail ? 'You sent an approval reminder to ' + req.approverName + ' for ' + req.number + '.' : null);
+        e === req.requesterEmail ? 'You sent an approval reminder to ' + req.approverName + ' for ' + req.number + '.' : null);
     persist();
   }
 
@@ -501,7 +606,7 @@
     addTimeline(req, actor, 'Reopened for modification', 'Approval review is paused until revisions are submitted.');
     notifyRequest(req, 'modified', e =>
       e === req.approverEmail ? req.number + ' was reopened by the requester for updates. Approvals are temporarily on hold.' :
-      e === req.requesterEmail ? 'You reopened ' + req.number + ' for modification.' : req.number + ' was reopened for modification.');
+        e === req.requesterEmail ? 'You reopened ' + req.number + ' for modification.' : req.number + ' was reopened for modification.');
     persist();
   }
 
@@ -522,7 +627,7 @@
     addTimeline(req, actor, 'Resubmitted (Version ' + req.version + ')', (labels.length ? 'Modified fields: ' + labels.join(', ') + '. ' : '') + (note || ''));
     notifyRequest(req, 'modified', e =>
       e === req.approverEmail ? req.number + ' has been resubmitted (v' + req.version + ') and is ready for your review.' :
-      e === req.requesterEmail ? 'You successfully resubmitted ' + req.number + ' (v' + req.version + ').' : req.number + ' was updated and resubmitted.');
+        e === req.requesterEmail ? 'You successfully resubmitted ' + req.number + ' (v' + req.version + ').' : req.number + ' was updated and resubmitted.');
     persist();
   }
 
@@ -557,7 +662,7 @@
     addTimeline(req, actor, 'Clarification Requested', text);
     notifyRequest(req, 'clarification', e =>
       e === req.requesterEmail ? actor.name + ' requested clarification on ' + req.number + ': ' + text :
-      actor.name + ' requested clarification on ' + req.number + '.');
+        actor.name + ' requested clarification on ' + req.number + '.');
     persist();
   }
 
@@ -580,7 +685,7 @@
     addTimeline(req, actor, 'Approval Delegated to ' + d.name, 'Generated ID ' + req.number + '. Revised deadline: ' + fmtDate(d.deadline) + '. ' + d.reason);
     notifyRequest(req, 'reassigned', e =>
       e === d.email ? 'Approval authority transferred: ' + req.number + ' (' + req.title + ') was delegated to you. Deadline ' + fmtDate(d.deadline) + '.' :
-      req.number + ' was delegated from ' + old.name + ' to ' + d.name + '. New deadline: ' + fmtDate(d.deadline) + '.', [old.email]);
+        req.number + ' was delegated from ' + old.name + ' to ' + d.name + '. New deadline: ' + fmtDate(d.deadline) + '.', [old.email]);
     persist();
   }
 
@@ -673,8 +778,8 @@
     t.className = 'toast toast-' + (type || 'info');
     t.setAttribute('role', 'status');
     const ic = type === 'success' ? 'fa-circle-check text-emerald-400' :
-               type === 'error' ? 'fa-circle-exclamation text-rose-400' :
-               type === 'warn' ? 'fa-triangle-exclamation text-amber-400' : 'fa-circle-info text-blue-400';
+      type === 'error' ? 'fa-circle-exclamation text-rose-400' :
+        type === 'warn' ? 'fa-triangle-exclamation text-amber-400' : 'fa-circle-info text-blue-400';
     t.innerHTML = '<i class="fa-solid ' + ic + '"></i><span>' + esc(msg) + '</span>';
     $('#toast-root').appendChild(t);
     setTimeout(() => {
@@ -1064,7 +1169,7 @@
                 </div>
                 <div>
                   ${isOverdue(r) ? '<span class="chip chip-danger !text-xs font-bold">Overdue by ' + Math.abs(daysLeft(r)) + ' day(s)</span>' :
-                    (daysLeft(r) === 0 ? '<span class="chip chip-warn !text-xs font-bold">Due Today</span>' : '<span class="chip chip-warn !text-xs font-bold">Due in ' + daysLeft(r) + ' day(s)</span>')}
+        (daysLeft(r) === 0 ? '<span class="chip chip-warn !text-xs font-bold">Due Today</span>' : '<span class="chip chip-warn !text-xs font-bold">Due in ' + daysLeft(r) + ' day(s)</span>')}
                 </div>
               </li>
             `).join('')}
@@ -1165,6 +1270,50 @@
     `;
   }
 
+  // --- Group Approvers Synchronization ---
+  function syncGroupApprovers() {
+    const groupEl = $('#f-group'), emailEl = $('#f-approverEmail'), nameEl = $('#f-approverName');
+    if (!groupEl || !emailEl || !nameEl) return;
+    const group = groupEl.value;
+    const approvers = approversByGroup[group] || [];
+
+    emailEl.value = '';
+    nameEl.value = '';
+
+    const errGroup = $('[data-err="f-group"]'); if (errGroup) errGroup.textContent = '';
+    const errEmail = $('[data-err="f-approverEmail"]'); if (errEmail) errEmail.textContent = '';
+    const errName = $('[data-err="f-approverName"]'); if (errName) errName.textContent = '';
+
+    if (!group || !approvers.length) {
+      emailEl.innerHTML = '<option value="">Select Group First</option>';
+      emailEl.disabled = true;
+    } else {
+      emailEl.disabled = false;
+      emailEl.innerHTML = '<option value="">Select Approver Email</option>' +
+        approvers.map(a => '<option value="' + esc(a.email) + '">' + esc(a.email) + '</option>').join('');
+    }
+  }
+
+  function syncApproverName() {
+    const groupEl = $('#f-group'), emailEl = $('#f-approverEmail'), nameEl = $('#f-approverName');
+    if (!groupEl || !emailEl || !nameEl) return;
+    const group = groupEl.value, email = emailEl.value;
+    const approvers = approversByGroup[group] || [];
+    const match = approvers.find(a => a.email.toLowerCase() === email.toLowerCase());
+
+    const errEmail = $('[data-err="f-approverEmail"]'); if (errEmail) errEmail.textContent = '';
+    const errName = $('[data-err="f-approverName"]'); if (errName) errName.textContent = '';
+
+    if (match) {
+      nameEl.value = match.name;
+    } else {
+      nameEl.value = '';
+      if (email) {
+        if (errName) errName.textContent = 'No matching approver record found for this email.';
+      }
+    }
+  }
+
   // --- Page: Create Request ---
   function pageCreate() {
     state.drafts.create = { stakeholders: [], files: [] };
@@ -1176,33 +1325,25 @@
         <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Submit a formal expenditure, travel, or process approval request into the multi-stage corporate governance chain.</p>
       </div>
 
-      <form id="req-form" class="grid gap-6" novalidate>
-        <!-- Section A: Request Overview -->
+      <form id="req-form" class="space-y-6" novalidate>
+        <!-- Single Card Layout -->
         <section class="card card-pad">
-          <h3 class="form-section-title"><span class="step-dot">A</span> Request Overview</h3>
-          <div class="mt-5 grid gap-4 sm:grid-cols-2">
-            ${field('f-requesterName', 'Requester Full Name', inputCtl('f-requesterName', { value: u.name }), { required: true })}
+          <div class="grid gap-4 sm:grid-cols-2">
+            ${field('f-requesterName', 'Requester Full Name', inputCtl('f-requesterName', { value: u.name, attrs: 'disabled readonly' }), { required: true })}
+            ${field('f-requesterEmail', 'Official Requester Email', inputCtl('f-requesterEmail', { type: 'email', value: u.email, attrs: 'disabled readonly' }), { required: true })}
             
-            <!-- Requirement 1: Official Requester Email must be editable, NOT read-only or disabled, with format validation -->
-            ${field('f-requesterEmail', 'Official Requester Email', inputCtl('f-requesterEmail', { type: 'email', value: u.email, ph: 'name@srmtech.com' }), { required: true, hint: 'Authorized domains: ' + esc(DOMAIN_TEXT) })}
-            
-            ${field('f-ccEmail', 'CC Email for Audit Logs', inputCtl('f-ccEmail', { type: 'email', ph: 'compliance@srmtech.com' }), { optional: true })}
+            ${field('f-group', 'Approver Group', selectCtl('f-group', GROUPS, { placeholder: 'Select Group' }), { required: true })}
+            ${field('f-approverEmail', 'Approver Official Email', '<select id="f-approverEmail" name="f-approverEmail" class="form-control" disabled><option value="">Select Group First</option></select>', { required: true })}
+            ${field('f-approverName', 'Approver Full Name', inputCtl('f-approverName', { ph: 'Auto-populated based on email selection', attrs: 'disabled readonly' }), { required: true })}
+            ${field('f-deadline', 'Sign-off Cutoff Deadline', inputCtl('f-deadline', { type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true, hint: 'Minimum ' + CONFIG.MIN_DEADLINE_DAYS + ' business days required (earliest: ' + fmtDate(minDeadlineISO()) + ').' })}
+
             ${field('f-title', 'Request Title', inputCtl('f-title', { ph: 'e.g. Developer Laptops for Q4 Engineering Onboarding' }), { required: true, span: true })}
             ${field('f-type', 'Approval Category', selectCtl('f-type', CONFIG.APPROVAL_TYPES, { placeholder: 'Select approval category' }), { required: true })}
             ${field('f-amount', 'Expected Amount Including Taxes (INR)', inputCtl('f-amount', { type: 'number', attrs: 'min="0" step="any" inputmode="decimal"' }), { required: true, hint: '<span id="f-amount-preview" class="mono font-bold text-blue-600"></span>' })}
             ${field('f-budgeted', 'Is This Budgeted in FY Allocation?', selectCtl('f-budgeted', CONFIG.BUDGET_OPTIONS, { placeholder: 'Select option' }), { required: true })}
             ${field('f-amountBudgeted', 'Allocated Budget Amount (INR)', inputCtl('f-amountBudgeted', { type: 'number', attrs: 'min="0" step="any" inputmode="decimal" readonly data-auto="1"' }), { required: true, wrapId: 'f-amountBudgeted-wrap', hidden: true, hint: 'Defaults to ₹ 0 if not budgeted.' })}
             ${field('f-extraReason', 'Justification for Extra Expense', inputCtl('f-extraReason', { ph: 'Explain why the expense exceeds the allocated budget...' }), { required: true, wrapId: 'f-extraReason-wrap', hidden: true, span: true, hint: 'Mandatory when requested amount exceeds budgeted allocation.' })}
-          </div>
-        </section>
 
-        <!-- Section B: Approver Routing -->
-        <section class="card card-pad">
-          <h3 class="form-section-title"><span class="step-dot">B</span> Approver Routing</h3>
-          <div class="mt-5 grid gap-4 sm:grid-cols-2">
-            ${field('f-approverEmail', 'Approver Official Email', inputCtl('f-approverEmail', { type: 'email', ph: 'approver@srmtech.com' }), { required: true, hint: 'Authorized domains: ' + esc(DOMAIN_TEXT) })}
-            ${field('f-approverName', 'Approver Full Name', inputCtl('f-approverName', { ph: 'e.g. John Doe' }), { required: true })}
-            ${field('f-deadline', 'Sign-off Cutoff Deadline', inputCtl('f-deadline', { type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true, hint: 'Minimum ' + CONFIG.MIN_DEADLINE_DAYS + ' business days required (earliest: ' + fmtDate(minDeadlineISO()) + ').' })}
             <div class="field sm:col-span-2">
               <label for="f-stake-input" class="lbl">Additional Stakeholder Emails <span class="opt">Optional</span></label>
               <div id="f-stake-chips" class="chip-input-wrap"></div>
@@ -1210,16 +1351,11 @@
               <p class="hint">Stakeholders receive status notifications and can view this request.</p>
               <p class="err" data-err="f-stake" role="alert"></p>
             </div>
-          </div>
-        </section>
 
-        <!-- Section C: Request Justification & Attachments -->
-        <section class="card card-pad">
-          <h3 class="form-section-title"><span class="step-dot">C</span> Request Justification & Attachments</h3>
-          <div class="mt-5 grid gap-4">
-            ${field('f-details', 'Comprehensive Details of Requirement', textareaCtl('f-details', { ph: 'Provide specifications, quantities, scope of work, or change parameters...' }), { required: true })}
-            ${field('f-reason', 'Business Need & Organizational Benefit', textareaCtl('f-reason', { ph: 'Explain the operational or commercial necessity...', attrs: 'style="min-height:5rem"' }), { required: true })}
-            <div class="field">
+            ${field('f-details', 'Comprehensive Details of Requirement', textareaCtl('f-details', { ph: 'Provide specifications, quantities, scope of work, or change parameters...' }), { required: true, span: true })}
+            ${field('f-reason', 'Business Need & Organizational Benefit', textareaCtl('f-reason', { ph: 'Explain the operational or commercial necessity...', attrs: 'style="min-height:5rem"' }), { required: true, span: true })}
+
+            <div class="field sm:col-span-2">
               <label for="f-file-input" class="lbl">Supporting Files & Quotations <span class="opt">Optional, up to ${CONFIG.MAX_ATTACHMENTS} files</span></label>
               <input id="f-file-input" type="file" class="form-control" multiple>
               <p class="hint">Accepts PDF, Excel, Word, CSV, and image files up to 10 MB each.</p>
@@ -1256,15 +1392,23 @@
 
   function validateRequestData(v) {
     const e = {};
-    if (v.requesterName !== undefined && !String(v.requesterName).trim()) e.requesterName = 'Enter the requester name.';
-    
-    // Validate Official Requester Email
-    const re = String(v.requesterEmail || '').trim().toLowerCase();
-    if (!re) e.requesterEmail = 'Enter the official requester email address.';
-    else if (!isEmail(re)) e.requesterEmail = 'Enter a valid email address format (e.g. name@srmtech.com).';
-    else if (!isApprovedEmail(re)) e.requesterEmail = 'Official requester email must belong to an approved SRM domain (' + DOMAIN_TEXT + ').';
+    if (!v.requesterName || !String(v.requesterName).trim()) e.requesterName = 'Requester name is required.';
 
-    if (v.ccEmail && !isEmail(v.ccEmail)) e.ccEmail = 'Enter a valid CC email address format.';
+    const re = String(v.requesterEmail || '').trim().toLowerCase();
+    if (!re) e.requesterEmail = 'Requester email is required.';
+    else if (!isEmail(re)) e.requesterEmail = 'Enter a valid email address format.';
+
+    if (!v.group) e.group = 'Select a Group.';
+    else if (!GROUPS.includes(v.group)) e.group = 'Select a valid group from the list.';
+
+    const groupApprovers = approversByGroup[v.group] || [];
+    const ae = String(v.approverEmail || '').trim().toLowerCase();
+    if (!ae) e.approverEmail = 'Select an approver official email.';
+    else if (!groupApprovers.some(a => a.email.toLowerCase() === ae)) e.approverEmail = 'Selected email does not belong to the chosen group.';
+    else if (re && identityEmails(re).includes(ae)) e.approverEmail = 'The requester cannot assign themselves as the approver.';
+
+    if (!v.approverName || !String(v.approverName).trim()) e.approverName = 'Approver name must be populated.';
+
     if (!String(v.title).trim()) e.title = 'Enter a request title.';
     if (!CONFIG.APPROVAL_TYPES.includes(v.type)) e.type = 'Select an approval category.';
     const amt = (v.amount === '' || v.amount == null) ? NaN : Number(v.amount);
@@ -1276,13 +1420,7 @@
     }
     const bud = v.budgeted === 'No' ? 0 : Number(v.amountBudgeted);
     if (!e.amount && !e.budgeted && !isNaN(bud) && bud < amt && !String(v.extraReason || '').trim()) e.extraReason = 'Provide an explanation for the extra expense beyond budget.';
-    
-    const ae = String(v.approverEmail || '').trim().toLowerCase();
-    if (!isEmail(ae)) e.approverEmail = 'Enter a valid approver email address.';
-    else if (!isApprovedEmail(ae)) e.approverEmail = 'The approver must belong to an SRM domain (' + DOMAIN_TEXT + ').';
-    else if (re && identityEmails(re).includes(ae)) e.approverEmail = 'The requester cannot assign themselves as the approver.';
 
-    if (!String(v.approverName).trim()) e.approverName = 'Enter the approver name.';
     if (!v.deadline) e.deadline = 'Pick an approval deadline.';
     else if (v.deadline < minDeadlineISO()) e.deadline = 'The deadline must be at least ' + CONFIG.MIN_DEADLINE_DAYS + ' days ahead (earliest ' + fmtDate(minDeadlineISO()) + ').';
     if (!String(v.details).trim()) e.details = 'Describe the details of your request.';
@@ -1291,13 +1429,23 @@
   }
 
   function submitCreate() {
-    const u = currentUser(), g = id => $('#' + id).value.trim();
-    const pending = addStakeholders('create', $('#f-stake-input').value);
+    const u = currentUser(), g = id => ($('#' + id) ? $('#' + id).value.trim() : '');
+    const pending = addStakeholders('create', $('#f-stake-input') ? $('#f-stake-input').value : '');
     const v = {
-      requesterName: g('f-requesterName'), requesterEmail: g('f-requesterEmail').toLowerCase(),
-      ccEmail: g('f-ccEmail').toLowerCase(), title: g('f-title'), type: g('f-type'), amount: g('f-amount'),
-      budgeted: g('f-budgeted'), amountBudgeted: g('f-amountBudgeted'), extraReason: g('f-extraReason'),
-      approverEmail: g('f-approverEmail').toLowerCase(), approverName: g('f-approverName'), deadline: g('f-deadline'), details: g('f-details'), reason: g('f-reason')
+      requesterName: g('f-requesterName') || u.name,
+      requesterEmail: (g('f-requesterEmail') || u.email).toLowerCase(),
+      group: g('f-group'),
+      approverEmail: g('f-approverEmail').toLowerCase(),
+      approverName: g('f-approverName'),
+      title: g('f-title'),
+      type: g('f-type'),
+      amount: g('f-amount'),
+      budgeted: g('f-budgeted'),
+      amountBudgeted: g('f-amountBudgeted'),
+      extraReason: g('f-extraReason'),
+      deadline: g('f-deadline'),
+      details: g('f-details'),
+      reason: g('f-reason')
     };
     const errs = validateRequestData(v);
     if (!pending) errs.stake = 'Fix the stakeholder email above before submitting.';
@@ -1306,9 +1454,22 @@
     const bud = v.budgeted === 'No' ? 0 : Number(v.amountBudgeted);
     const d = state.drafts.create;
     const req = wfCreate({
-      requesterName: v.requesterName, requesterEmail: v.requesterEmail, vertical: u.vertical, ccEmail: v.ccEmail, title: v.title, type: v.type, amount: Number(v.amount),
-      budgeted: v.budgeted, amountBudgeted: bud, extraReason: bud < Number(v.amount) ? v.extraReason : '',
-      approverEmail: v.approverEmail, approverName: v.approverName, deadline: v.deadline, stakeholders: d.stakeholders.slice(), details: v.details, reason: v.reason,
+      requesterName: v.requesterName,
+      requesterEmail: v.requesterEmail,
+      group: v.group,
+      vertical: u.vertical || '',
+      title: v.title,
+      type: v.type,
+      amount: Number(v.amount),
+      budgeted: v.budgeted,
+      amountBudgeted: bud,
+      extraReason: bud < Number(v.amount) ? v.extraReason : '',
+      approverEmail: v.approverEmail,
+      approverName: v.approverName,
+      deadline: v.deadline,
+      stakeholders: d.stakeholders.slice(),
+      details: v.details,
+      reason: v.reason,
       attachments: d.files.slice()
     }, actorOf(u));
     state.drafts.create = { stakeholders: [], files: [] };
@@ -1317,7 +1478,12 @@
     openModal({
       title: 'Request Successfully Submitted', hideFooter: true,
       body: '<div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium mb-3">' +
-        '<i class="fa-solid fa-circle-check mr-1.5"></i> Request logged and assigned to ' + esc(req.approverName) + '.</div>' +
+        '<i class="fa-solid fa-circle-check mr-1.5"></i> Request logged and assigned to ' + esc(req.approverName) + ' (' + esc(req.group) + ').</div>' +
+        '<p class="text-xs text-slate-500 uppercase tracking-wide font-bold">Assigned Request Reference</p>' +
+        '<p class="mono text-2xl font-extrabold text-slate-900 mt-1">' + esc(req.number) + '</p>' +
+        '<p class="text-xs text-slate-500 mt-2 mb-4">Requester Email: <span class="font-mono text-slate-700">' + esc(req.requesterEmail) + '</span></p>' +
+        '<div class="flex flex-wrap gap-2">' +
+        '<button type="button" class="btn btn-primary" data-action="view-request" data-id="' + req.id + '"><i class="fa-solid fa-eye mr-1"></i> Open Request Details Page</button>' +
         '<p class="text-xs text-slate-500 uppercase tracking-wide font-bold">Assigned Request Reference</p>' +
         '<p class="mono text-2xl font-extrabold text-slate-900 mt-1">' + esc(req.number) + '</p>' +
         '<p class="text-xs text-slate-500 mt-2 mb-4">Requester Email: <span class="font-mono text-slate-700">' + esc(req.requesterEmail) + '</span></p>' +
@@ -1494,8 +1660,10 @@
       { h: 'Business Vertical', cell: u => '<span class="text-xs font-medium text-slate-700">' + esc(u.vertical) + '</span>' },
       { h: 'Role', cell: u => '<span class="badge ' + (u.role === 'admin' ? 'badge-reassigned' : 'badge-withdrawn') + '">' + (u.role === 'admin' ? 'Admin' : 'User') + '</span>' },
       { h: 'Status', cell: u => '<span class="badge ' + (u.active ? 'badge-approved' : 'badge-rejected') + '">' + (u.active ? 'Active' : 'Inactive') + '</span>' },
-      { h: 'Actions', cell: u => '<div class="flex items-center gap-1.5"><button type="button" class="btn btn-sm btn-outline !text-xs" data-action="user-edit" data-id="' + u.id + '"><i class="fa-solid fa-pen text-[10px] mr-1"></i> Edit</button>' +
-        '<button type="button" class="btn btn-sm ' + (u.active ? 'btn-danger-outline' : 'btn-outline') + ' !text-xs" data-action="user-toggle" data-id="' + u.id + '">' + (u.active ? 'Deactivate' : 'Activate') + '</button></div>' }
+      {
+        h: 'Actions', cell: u => '<div class="flex items-center gap-1.5"><button type="button" class="btn btn-sm btn-outline !text-xs" data-action="user-edit" data-id="' + u.id + '"><i class="fa-solid fa-pen text-[10px] mr-1"></i> Edit</button>' +
+          '<button type="button" class="btn btn-sm ' + (u.active ? 'btn-danger-outline' : 'btn-outline') + ' !text-xs" data-action="user-toggle" data-id="' + u.id + '">' + (u.active ? 'Deactivate' : 'Activate') + '</button></div>'
+      }
     ], 'No users match your search query.');
   }
 
@@ -1634,8 +1802,8 @@
 
     const navSource = state.navState || { page: 'my-requests' };
     const sourceLabel = navSource.page === 'dashboard' ? 'Dashboard' :
-                        navSource.page === 'approvals' ? 'Approval List' :
-                        navSource.page === 'notifications' ? 'Notifications' : 'My Requests';
+      navSource.page === 'approvals' ? 'Approval List' :
+        navSource.page === 'notifications' ? 'Notifications' : 'My Requests';
 
     return `
       <!-- Top Breadcrumb & Return Action -->
@@ -1666,7 +1834,7 @@
               ${statusBadge(req)}
               <span class="text-xs text-slate-500 font-medium">Version ${req.version}</span>
               ${isOverdue(req) ? '<span class="chip chip-danger !text-xs"><i class="fa-solid fa-triangle-exclamation text-[10px]"></i> Overdue</span>' :
-                (isDueSoon(req) ? '<span class="chip chip-warn !text-xs"><i class="fa-solid fa-clock text-[10px]"></i> ' + (daysLeft(req) === 0 ? 'Due Today' : 'Due in ' + daysLeft(req) + 'd') + '</span>' : '')}
+        (isDueSoon(req) ? '<span class="chip chip-warn !text-xs"><i class="fa-solid fa-clock text-[10px]"></i> ' + (daysLeft(req) === 0 ? 'Due Today' : 'Due in ' + daysLeft(req) + 'd') + '</span>' : '')}
             </div>
             <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight break-words">${esc(req.title)}</h1>
           </div>
@@ -2204,12 +2372,24 @@
     'fill-demo'(el) {
       $('#login-email').value = el.dataset.email;
       $('#login-password').value = '123';
-      if (!$('#login-vertical').value) $('#login-vertical').selectedIndex = 1;
       $('#login-password').focus();
     },
     'show-otp-info': showOtpInfo,
+    'back-to-login'() {
+      showCredentialsScreen();
+    },
+    'resend-otp'() {
+      if (state.pendingLogin && state.pendingLogin.user) {
+        const otpErr = $('#otp-error');
+        if (otpErr) otpErr.classList.add('hidden');
+        const otpInput = $('#login-otp');
+        if (otpInput) { otpInput.value = ''; otpInput.focus(); }
+        toast('A verification OTP (1111) has been resent to ' + state.pendingLogin.user.email + '.', 'info');
+      }
+    },
     logout() {
       endSession();
+      showCredentialsScreen();
       closeModal();
       hideActionDropdown();
       location.hash = '';
@@ -2375,6 +2555,7 @@
     const id = e.target.id; if (!id) return;
     e.preventDefault();
     if (id === 'login-form') handleLogin();
+    else if (id === 'otp-form') handleVerifyOtp();
     else if (id === 'req-form') submitCreate();
     else if (id === 'modify-form') submitModify();
     else if (id === 'profile-form') saveProfile();
@@ -2387,6 +2568,9 @@
   // Live Input & Search Filters
   document.addEventListener('input', e => {
     const t = e.target;
+    if (t.id === 'login-otp') {
+      t.value = t.value.replace(/\D/g, '').slice(0, 4);
+    }
     if (t.id === 'f-amount' || t.id === 'f-amountBudgeted') {
       syncBudget();
       if (t.id === 'f-amount') { const p = $('#f-amount-preview'); if (p) p.textContent = t.value !== '' && !isNaN(+t.value) ? fmtINR(t.value) : ''; }
@@ -2413,6 +2597,8 @@
 
   document.addEventListener('change', e => {
     const t = e.target;
+    if (t.id === 'f-group') syncGroupApprovers();
+    if (t.id === 'f-approverEmail') syncApproverName();
     if (t.id === 'f-budgeted') syncBudget();
     if (t.id === 'f-file-input') { addFiles('create', t.files); t.value = ''; }
     if (t.id === 'm-file-input') { addFiles('modify', t.files); t.value = ''; }
@@ -2459,9 +2645,8 @@
      14. ROUTER & START-UP
      ======================================================= */
   function handleLogin() {
-    const vertical = $('#login-vertical').value, email = $('#login-email').value.trim().toLowerCase(), password = $('#login-password').value, errs = {};
+    const email = $('#login-email').value.trim().toLowerCase(), password = $('#login-password').value, errs = {};
     const box = $('#login-error'); box.classList.add('hidden');
-    if (!vertical) errs.vertical = 'Select your business vertical.';
     if (!email) errs.email = 'Enter your official SRM email address.';
     else if (!isEmail(email)) errs.email = 'Enter a valid email address.';
     else if (!isApprovedEmail(email)) errs.email = 'Must use an approved SRM domain (' + DOMAIN_TEXT + ').';
@@ -2470,11 +2655,58 @@
     if (Object.keys(errs).length) return;
     const res = authProviders.password.login(email, password);
     if (!res.ok) { box.textContent = res.error; box.classList.remove('hidden'); return; }
-    startSession(res.user, vertical);
-    $('#login-form').reset();
+
+    // Credentials valid -> Proceed to OTP Verification (Step 2)
+    state.pendingLogin = {
+      user: res.user,
+      vertical: res.user.vertical || ''
+    };
+    showOtpScreen(res.user.email);
+    toast('A verification OTP has been sent to your registered email address.', 'info');
+  }
+
+  function handleVerifyOtp() {
+    const otpErr = $('#otp-error');
+    if (otpErr) {
+      otpErr.classList.add('hidden');
+      otpErr.textContent = '';
+    }
+
+    if (!state.pendingLogin || !state.pendingLogin.user) {
+      showCredentialsScreen();
+      return;
+    }
+
+    const otpInput = $('#login-otp');
+    const enteredOtp = (otpInput ? otpInput.value : '').trim();
+
+    // Verify OTP against prototype hardcoded code 1111
+    if (enteredOtp !== '1111') {
+      if (otpErr) {
+        otpErr.textContent = 'Invalid OTP. Please enter the correct OTP.';
+        otpErr.classList.remove('hidden');
+      }
+      if (otpInput) {
+        otpInput.focus();
+        otpInput.select();
+      }
+      return;
+    }
+
+    // OTP Verified successfully!
+    const { user, vertical } = state.pendingLogin;
+    startSession(user, vertical);
+    state.pendingLogin = null;
+
+    // Reset login form and restore panels
+    const loginForm = $('#login-form');
+    if (loginForm) loginForm.reset();
+    showCredentialsScreen();
+
+    // Navigate to appropriate dashboard based on role (User or Admin)
     location.hash = '#/dashboard';
     route();
-    toast('Welcome back, ' + res.user.name + '.', 'success');
+    toast('Welcome back, ' + user.name + '.', 'success');
   }
 
   const PAGES = {
@@ -2505,7 +2737,9 @@
     if (!user) {
       $('#app-view').classList.add('hidden');
       $('#login-view').classList.remove('hidden');
-      if (!$('#login-vertical').options.length) populateLogin();
+      if (!state.pendingLogin) {
+        showCredentialsScreen();
+      }
       return;
     }
     $('#login-view').classList.add('hidden');
@@ -2523,19 +2757,19 @@
     $('#page-container').innerHTML = PAGES[r.page](r);
     closeSidebar();
 
-    if (r.page === 'create') { syncBudget(); renderChips('create'); renderFiles('create'); }
+    if (r.page === 'create') {
+      syncBudget();
+      renderChips('create');
+      renderFiles('create');
+      syncGroupApprovers();
+    }
     if (r.page === 'modify') { renderChips('modify'); renderFiles('modify'); }
     window.scrollTo(0, 0);
-  }
-
-  function populateLogin() {
-    $('#login-vertical').innerHTML = '<option value="">Select your business vertical</option>' + CONFIG.VERTICALS.map(v => '<option>' + esc(v) + '</option>').join('');
   }
 
   function init() {
     loadDB();
     restoreSession();
-    populateLogin();
     window.addEventListener('hashchange', route);
     route();
   }

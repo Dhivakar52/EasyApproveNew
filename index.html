@@ -71,7 +71,7 @@
         <div class="relative z-10">
           <div class="flex items-center gap-3">
             <div class="logo-mark shadow-lg shadow-blue-500/30">
-              <span>EA</span>
+              <img src="assets/images/white-logo.png" alt="Easy Approve Logo" class="logo-img">
             </div>
             <div>
               <span class="text-xl font-bold tracking-tight text-white block">Easy Approve</span>
@@ -123,91 +123,150 @@
       <div class="lg:col-span-6 xl:col-span-5 flex min-h-screen items-center justify-center p-6 sm:p-10 bg-slate-50">
         <div
           class="w-full max-w-md bg-white p-8 sm:p-10 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/80">
-          <div class="mb-8 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="logo-mark lg:hidden">
-                <span>EA</span>
+          <!-- STEP 1: Credentials Form Panel -->
+          <div id="login-credentials-panel">
+            <div class="mb-8 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="logo-mark lg:hidden">
+                  <img src="assets/images/white-logo.png" alt="Easy Approve Logo" class="logo-img">
+                </div>
+                <div>
+                  <h1 class="text-2xl font-bold tracking-tight text-slate-900">Sign In</h1>
+                  <p class="text-sm text-slate-500 mt-0.5">Access your Easy Approve Workspace</p>
+                </div>
               </div>
-              <div>
-                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Sign In</h1>
-                <p class="text-sm text-slate-500 mt-0.5">Access your Easy Approve Workspace</p>
-              </div>
+              <span
+                class="px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-50 text-blue-700 border border-blue-100 hidden sm:inline-block">SSO
+                Enabled</span>
             </div>
-            <span
-              class="px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-50 text-blue-700 border border-blue-100 hidden sm:inline-block">SSO
-              Enabled</span>
+
+            <div id="login-error" class="alert alert-error mb-5 hidden" role="alert"></div>
+
+            <form id="login-form" class="space-y-4" novalidate>
+
+              <div>
+                <label for="login-email" class="lbl">Official SRM Email <span class="req">*</span></label>
+                <div class="relative">
+                  <input id="login-email" type="email" class="form-control pl-10" autocomplete="username"
+                    placeholder="name@srmtech.com">
+                  <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                </div>
+                <p class="err" data-err="login-email" role="alert"></p>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label for="login-password" class="lbl !mb-0">Password <span class="req">*</span></label>
+                  <button type="button" class="text-xs text-brand-600 hover:text-brand-700 font-semibold"
+                    data-action="show-otp-info">OTP Alternative?</button>
+                </div>
+                <div class="relative">
+                  <input id="login-password" type="password" class="form-control pl-10 pr-16"
+                    autocomplete="current-password">
+                  <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                  <button type="button" id="toggle-password" data-action="toggle-password" class="pw-toggle"
+                    aria-pressed="false">Show</button>
+                </div>
+                <p class="err" data-err="login-password" role="alert"></p>
+              </div>
+
+              <button type="submit"
+                class="btn btn-primary w-full !py-2.5 !text-sm !font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 transition-all">
+                <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Sign In to Platform
+              </button>
+            </form>
+
+            <!-- Quick Demo Access Box -->
+            <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> One-Click Demo Accounts
+                </span>
+                <span class="text-[11px] font-mono text-slate-500">pwd: 123</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-2">
+                <button type="button"
+                  class="btn btn-sm btn-outline text-left justify-start !text-xs font-medium hover:border-blue-400 hover:bg-white"
+                  data-action="fill-demo" data-email="user@srmtech.com">
+                  <i class="fa-solid fa-user text-blue-600 mr-1.5"></i> Requester
+                </button>
+                <button type="button"
+                  class="btn btn-sm btn-outline text-left justify-start !text-xs font-medium hover:border-blue-400 hover:bg-white"
+                  data-action="fill-demo" data-email="admin@srmtech.com">
+                  <i class="fa-solid fa-user-shield text-indigo-600 mr-1.5"></i> Admin Approver
+                </button>
+              </div>
+              <p class="mt-2.5 text-[11px] text-slate-400 leading-tight">
+                Prototype simulation. Session and records are stored locally in your browser.
+              </p>
+            </div>
           </div>
 
-          <div id="login-error" class="alert alert-error mb-5 hidden" role="alert"></div>
-
-          <form id="login-form" class="space-y-4" novalidate>
-            <div>
-              <label for="login-vertical" class="lbl">Business Vertical <span class="req">*</span></label>
-              <div class="relative">
-                <select id="login-vertical" class="form-control pl-10 appearance-none bg-no-repeat"></select>
-                <i
-                  class="fa-solid fa-briefcase absolute left-3.5 top-3.5 text-slate-400 pointer-events-none text-sm"></i>
-                <i
-                  class="fa-solid fa-chevron-down absolute right-3.5 top-3.5 text-slate-400 pointer-events-none text-xs"></i>
+          <!-- STEP 2: OTP Verification Screen -->
+          <div id="login-otp-panel" class="hidden">
+            <div class="mb-6 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-lg">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                  <h1 class="text-xl font-bold tracking-tight text-slate-900">OTP Verification</h1>
+                  <p class="text-xs text-slate-500 mt-0.5">Two-Factor Security Sign-In</p>
+                </div>
               </div>
-              <p class="err" data-err="login-vertical" role="alert"></p>
-            </div>
-
-            <div>
-              <label for="login-email" class="lbl">Official SRM Email <span class="req">*</span></label>
-              <div class="relative">
-                <input id="login-email" type="email" class="form-control pl-10" autocomplete="username"
-                  placeholder="name@srmtech.com">
-                <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
-              </div>
-              <p class="err" data-err="login-email" role="alert"></p>
-            </div>
-
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label for="login-password" class="lbl !mb-0">Password <span class="req">*</span></label>
-                <button type="button" class="text-xs text-brand-600 hover:text-brand-700 font-semibold"
-                  data-action="show-otp-info">OTP Alternative?</button>
-              </div>
-              <div class="relative">
-                <input id="login-password" type="password" class="form-control pl-10 pr-16"
-                  autocomplete="current-password">
-                <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
-                <button type="button" id="toggle-password" data-action="toggle-password" class="pw-toggle"
-                  aria-pressed="false">Show</button>
-              </div>
-              <p class="err" data-err="login-password" role="alert"></p>
-            </div>
-
-            <button type="submit"
-              class="btn btn-primary w-full !py-2.5 !text-sm !font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 transition-all">
-              <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Sign In to Platform
-            </button>
-          </form>
-
-          <!-- Quick Demo Access Box -->
-          <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> One-Click Demo Accounts
+              <span class="px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
+                <i class="fa-solid fa-circle-check text-[10px]"></i> Step 2/2
               </span>
-              <span class="text-[11px] font-mono text-slate-500">pwd: 123</span>
             </div>
-            <div class="grid grid-cols-2 gap-2 mt-2">
-              <button type="button"
-                class="btn btn-sm btn-outline text-left justify-start !text-xs font-medium hover:border-blue-400 hover:bg-white"
-                data-action="fill-demo" data-email="user@srmtech.com">
-                <i class="fa-solid fa-user text-blue-600 mr-1.5"></i> Requester
-              </button>
-              <button type="button"
-                class="btn btn-sm btn-outline text-left justify-start !text-xs font-medium hover:border-blue-400 hover:bg-white"
-                data-action="fill-demo" data-email="admin@srmtech.com">
-                <i class="fa-solid fa-user-shield text-indigo-600 mr-1.5"></i> Admin Approver
-              </button>
+
+            <!-- Email Notification Notice -->
+            <div class="p-3.5 rounded-xl bg-blue-50/70 border border-blue-100 text-slate-700 mb-4">
+              <div class="flex items-start gap-2.5">
+                <i class="fa-solid fa-envelope-circle-check text-blue-600 mt-0.5 text-base flex-shrink-0"></i>
+                <div class="text-xs space-y-1">
+                  <p class="font-medium text-slate-800 leading-relaxed">
+                    A verification OTP has been sent to your registered email address.
+                  </p>
+                  <p class="font-mono text-blue-700 font-semibold truncate" id="otp-target-email"></p>
+                </div>
+              </div>
             </div>
-            <p class="mt-2.5 text-[11px] text-slate-400 leading-tight">
-              Prototype simulation. Session and records are stored locally in your browser.
-            </p>
+
+            <!-- Testing Prototype Notice -->
+            <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200/80 mb-4 flex items-center justify-between text-xs text-amber-900">
+              <span class="flex items-center gap-1.5 font-medium">
+                <i class="fa-solid fa-key text-amber-600"></i> Testing OTP:
+              </span>
+              <span class="font-mono font-bold bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-800 tracking-wider">1111</span>
+            </div>
+
+            <div id="otp-error" class="alert alert-error mb-4 hidden" role="alert"></div>
+
+            <form id="otp-form" class="space-y-4" novalidate>
+              <div>
+                <label for="login-otp" class="lbl text-center !mb-1.5">Enter 4-Digit Security Code <span class="req">*</span></label>
+                <div class="relative">
+                  <input id="login-otp" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4"
+                    class="form-control text-center text-2xl font-mono tracking-[0.6em] font-bold py-3 bg-slate-50/50 focus:bg-white transition-all"
+                    placeholder="••••" autocomplete="one-time-code">
+                  <i class="fa-solid fa-lock absolute left-3.5 top-4 text-slate-300 text-sm pointer-events-none"></i>
+                </div>
+                <p class="text-center text-xs text-slate-400 mt-2">
+                  Didn't receive code?
+                  <button type="button" class="text-blue-600 font-semibold hover:underline" data-action="resend-otp">Resend OTP</button>
+                </p>
+              </div>
+
+              <button type="submit"
+                class="btn btn-primary w-full !py-2.5 !text-sm !font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 transition-all">
+                <i class="fa-solid fa-shield-check mr-2"></i> Verify OTP
+              </button>
+
+              <button type="button" data-action="back-to-login"
+                class="btn btn-outline w-full !py-2.5 !text-sm font-medium hover:bg-slate-50 transition-all">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Back to Login
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -227,7 +286,7 @@
       <div class="flex items-center justify-between px-5 py-5 border-b border-slate-800/80">
         <div class="flex items-center gap-3">
           <div class="logo-mark shadow-md shadow-blue-500/20">
-            <span>EA</span>
+            <img src="assets/images/white-logo.png" alt="Easy Approve Logo" class="logo-img">
           </div>
           <div>
             <span class="font-bold text-sm tracking-tight text-white block">Easy Approve</span>

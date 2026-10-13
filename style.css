@@ -147,6 +147,14 @@ body {
   font-size: 0.8rem;
   letter-spacing: 0.05em;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  overflow: hidden;
+}
+
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 3px;
 }
 
 .login-hero {
@@ -1142,6 +1150,27 @@ textarea.form-control {
 @keyframes toast-in {
   from { transform: translateY(-8px); opacity: 0; }
   to { transform: none; opacity: 1; }
+}
+
+/* ---------- Alerts & Notices ---------- */
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 0.55rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.alert.alert-error {
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+}
+
+.alert.alert-info {
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1E40AF;
 }
 
 /* ---------- Responsive Adjustments ---------- */
