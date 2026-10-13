@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SRM Enterprise Approval Platform</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Font Awesome 6 CDN for Enterprise Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- Tailwind CSS via CDN (prototype only) -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#EFF6FF',
+              100: '#DBEAFE',
+              200: '#BFDBFE',
+              500: '#3B82F6',
+              600: '#2563EB',
+              700: '#1D4ED8',
+              800: '#1E40AF',
+              900: '#1E3A8A'
+            },
+            navy: {
+              700: '#1E293B',
+              800: '#0F172A',
+              900: '#0B132B',
+              950: '#070D1E'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-slate-50 text-slate-800 antialiased font-sans selection:bg-brand-500 selection:text-white">
+
+  <!-- =========================================================
+       LOGIN VIEW (shown when nobody is logged in)
+       ========================================================= -->
+  <section id="login-view" class="hidden">
+    <div class="min-h-screen lg:grid lg:grid-cols-12 bg-slate-900">
+      <!-- Hero Left Column -->
+      <div
+        class="login-hero hidden lg:flex lg:col-span-6 xl:col-span-7 flex-col justify-between p-12 lg:p-16 text-white relative overflow-hidden">
+        <!-- Background decorative gradients -->
+        <div class="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none">
+        </div>
+
+        <div class="relative z-10">
+          <div class="flex items-center gap-3">
+            <div class="logo-mark shadow-lg shadow-blue-500/30">
+              <span>SRM</span>
+            </div>
+            <div>
+              <span class="text-xl font-bold tracking-tight text-white block">Approval Cloud</span>
+              <span class="text-xs uppercase tracking-wider text-blue-200/80 font-medium">Enterprise Workflow
+                Suite</span>
+            </div>
+          </div>
+
+          <div class="mt-20 max-w-xl">
+            <span
+              class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-sm mb-6">
+              <i class="fa-solid fa-shield-halved text-[10px]"></i> Enterprise Audit Compliance v2.4
+            </span>
+            <h2 class="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight text-white">
+              Every request. <br>One transparent <span
+                class="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-indigo-200">decision
+                trail.</span>
+            </h2>
+            <p class="mt-5 text-base text-slate-300 leading-relaxed font-normal">
+              Accelerate corporate governance with multi-stage sign-offs, real-time stakeholder tracking, dynamic
+              delegation, and immutable decision histories.
+            </p>
+          </div>
+
+          <!-- Feature badges -->
+          <div class="mt-12 grid grid-cols-2 gap-4 max-w-lg">
+            <div class="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md">
+              <i class="fa-solid fa-bolt text-blue-400 text-lg mb-2 block"></i>
+              <h4 class="text-sm font-semibold text-white">Fast-Track Routing</h4>
+              <p class="text-xs text-slate-300 mt-1">Multi-tier approval workflows with auto-escalation & reminders.</p>
+            </div>
+            <div class="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md">
+              <i class="fa-solid fa-timeline text-indigo-400 text-lg mb-2 block"></i>
+              <h4 class="text-sm font-semibold text-white">Audited History</h4>
+              <p class="text-xs text-slate-300 mt-1">Strikethrough revision tracking and tamper-proof decision logs.</p>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="relative z-10 pt-8 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+          <span>&copy; 2026 SRM Technologies. All rights reserved.</span>
+          <span class="flex items-center gap-1.5"><span
+              class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Client Sandbox Ready</span>
+        </div>
+      </div>
+
+      <!-- Login Form Right Column -->
+      <div class="lg:col-span-6 xl:col-span-5 flex min-h-screen items-center justify-center p-6 sm:p-10 bg-slate-50">
+        <div
+          class="w-full max-w-md bg-white p-8 sm:p-10 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/80">
+          <div class="mb-8 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="logo-mark lg:hidden">
+                <span>SRM</span>
+              </div>
+              <div>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Sign In</h1>
+                <p class="text-sm text-slate-500 mt-0.5">Access your SRM Approval Workspace</p>
+              </div>
+            </div>
+            <span
+              class="px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-50 text-blue-700 border border-blue-100 hidden sm:inline-block">SSO
+              Enabled</span>
+          </div>
+
+          <div id="login-error" class="alert alert-error mb-5 hidden" role="alert"></div>
+
+          <form id="login-form" class="space-y-4" novalidate>
+            <div>
+              <label for="login-vertical" class="lbl">Business Vertical <span class="req">*</span></label>
+              <div class="relative">
+                <select id="login-vertical" class="form-control pl-10 appearance-none bg-no-repeat"></select>
+                <i
+                  class="fa-solid fa-briefcase absolute left-3.5 top-3.5 text-slate-400 pointer-events-none text-sm"></i>
+                <i
+                  class="fa-solid fa-chevron-down absolute right-3.5 top-3.5 text-slate-400 pointer-events-none text-xs"></i>
+              </div>
+              <p class="err" data-err="login-vertical" role="alert"></p>
+            </div>
+
+            <div>
+              <label for="login-email" class="lbl">Official SRM Email <span class="req">*</span></label>
+              <div class="relative">
+                <input id="login-email" type="email" class="form-control pl-10" autocomplete="username"
+                  placeholder="name@srmtech.com">
+                <i class="fa-solid fa-envelope absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+              </div>
+              <p class="err" data-err="login-email" role="alert"></p>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label for="login-password" class="lbl !mb-0">Password <span class="req">*</span></label>
+                <button type="button" class="text-xs text-brand-600 hover:text-brand-700 font-semibold"
+                  data-action="show-otp-info">OTP Alternative?</button>
+              </div>
+              <div class="relative">
+                <input id="login-password" type="password" class="form-control pl-10 pr-16"
+                  autocomplete="current-password">
+                <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-slate-400 text-sm"></i>
+                <button type="button" id="toggle-password" data-action="toggle-password" class="pw-toggle"
+                  aria-pressed="false">Show</button>
+              </div>
+              <p class="err" data-err="login-password" role="alert"></p>
+            </div>
+
+            <button type="submit"
+              class="btn btn-primary w-full !py-2.5 !text-sm !font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 transition-all">
+              <i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> Sign In to Platform
+            </button>
+          </form>
+
+          <!-- Quick Demo Access Box -->
+          <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> One-Click Demo Accounts
+              </span>
+              <span class="text-[11px] font-mono text-slate-500">pwd: 123</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <button type="button"
+                class="btn btn-sm btn-outline text-left justify-start !text-xs font-medium hover:border-blue-400 hover:bg-white"
+                data-action="fill-demo" data-email="user@srmtech.com">
+                <i class="fa-solid fa-user text-blue-600 mr-1.5"></i> Requester
+              </button>
+              <button type="button"
+                class="btn btn-sm btn-outline text-left justify-start !text-xs font-medium hover:border-blue-400 hover:bg-white"
+                data-action="fill-demo" data-email="admin@srmtech.com">
+                <i class="fa-solid fa-user-shield text-indigo-600 mr-1.5"></i> Admin Approver
+              </button>
+            </div>
+            <p class="mt-2.5 text-[11px] text-slate-400 leading-tight">
+              Prototype simulation. Session and records are stored locally in your browser.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       APPLICATION VIEW (shown after login)
+       ========================================================= -->
+  <div id="app-view" class="hidden min-h-screen bg-slate-50 flex">
+    <!-- Backdrop for mobile sidebar drawer -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop hidden" data-action="close-sidebar"></div>
+
+    <!-- Enterprise Sidebar -->
+    <aside id="sidebar" class="sidebar" aria-label="Primary Navigation">
+      <!-- Sidebar Brand Header -->
+      <div class="flex items-center justify-between px-5 py-5 border-b border-slate-800/80">
+        <div class="flex items-center gap-3">
+          <div class="logo-mark shadow-md shadow-blue-500/20">
+            <span>SRM</span>
+          </div>
+          <div>
+            <span class="font-bold text-sm tracking-tight text-white block">Approval Cloud</span>
+            <span class="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Enterprise Suite</span>
+          </div>
+        </div>
+        <button type="button" class="text-slate-400 hover:text-white lg:hidden p-1" data-action="close-sidebar"
+          aria-label="Close sidebar">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Navigation links -->
+      <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Main menu"></nav>
+
+      <!-- Sidebar User Footer -->
+      <div class="border-t border-slate-800/80 p-4 bg-navy-950/60">
+        <div class="flex items-center gap-3 mb-3">
+          <div id="sidebar-user-avatar" class="avatar !w-9 !h-9 text-xs font-bold bg-blue-600 text-white flex-shrink-0">
+          </div>
+          <div class="min-w-0 flex-1">
+            <p id="sidebar-user-name" class="truncate text-xs font-semibold text-white"></p>
+            <p id="sidebar-user-email" class="truncate text-[11px] text-slate-400 font-mono"></p>
+            <span id="sidebar-user-role"
+              class="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold"></span>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sidebar w-full !text-xs !py-1.5 flex items-center justify-center gap-2"
+          data-action="logout">
+          <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i> Log out
+        </button>
+      </div>
+    </aside>
+
+    <!-- App Main Workspace -->
+    <div class="app-main flex-1 min-w-0 flex flex-col">
+      <!-- Enterprise Topbar -->
+      <header class="topbar sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200">
+        <div class="flex min-w-0 items-center gap-3">
+          <!-- Mobile sidebar toggle -->
+          <button type="button" class="icon-btn lg:hidden" data-action="toggle-sidebar" aria-label="Open menu">
+            <i class="fa-solid fa-bars text-slate-700 text-base"></i>
+          </button>
+
+          <div class="flex items-center gap-3">
+            <h1 id="page-title" class="truncate text-lg sm:text-xl font-bold tracking-tight text-slate-900">Dashboard
+            </h1>
+            <span id="page-badge"
+              class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">Enterprise
+              v2.4</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+          <!-- Quick Global Search trigger -->
+          <div class="hidden md:flex items-center relative text-slate-400 focus-within:text-slate-600">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs"></i>
+            <input id="global-quick-search" type="text" placeholder="Quick find (Press / to search)..."
+              class="w-48 lg:w-64 pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+          </div>
+
+          <!-- Notification Bell with Ping -->
+          <button type="button" class="icon-btn relative hover:bg-slate-100 rounded-lg transition-colors"
+            data-action="go" data-page="notifications" aria-label="Notifications">
+            <i class="fa-regular fa-bell text-slate-700 text-base"></i>
+            <span id="bell-count" class="bell-count hidden">0</span>
+          </button>
+
+          <!-- Demo Date Switcher Chip -->
+          <div id="demo-date-wrap" class="flex items-center">
+            <span id="demo-date-chip" class="chip chip-warn !text-xs !py-1 !px-2.5 cursor-pointer font-medium"
+              data-action="go" data-page="dashboard" title="Demo Time Machine setting" hidden></span>
+          </div>
+
+          <!-- User profile badge -->
+          <button type="button" id="account-btn" class="account-btn hover:border-slate-300 transition-all"
+            data-action="go" data-page="profile" aria-label="Open profile"></button>
+
+          <!-- Topbar Logout button -->
+          <button type="button"
+            class="btn btn-sm btn-outline hidden sm:inline-flex !text-xs !px-3 font-medium text-slate-700 hover:text-slate-900"
+            data-action="logout">
+            <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Exit
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Page Container -->
+      <main id="page-container" class=" px-4 py-6 sm:px-6 lg:px-8 flex-1" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       FLOATING ACTION DROPDOWN MENU ROOT
+       (Positioned relative to the 3-dot trigger button)
+       ========================================================= -->
+  <div id="action-dropdown"
+    class="fixed hidden z-50 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 w-56 text-sm transform opacity-0 transition-all duration-150 ease-out pointer-events-none"
+    role="menu" aria-orientation="vertical"></div>
+
+  <!-- =========================================================
+       RIGHT-SIDE SLIDE-IN DRAWER ROOT
+       (Full Request Details & Approver Action Suite)
+       ========================================================= -->
+  <div id="drawer-root"></div>
+
+  <!-- Shared overlays: Modal and Toasts -->
+  <div id="modal-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
