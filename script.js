@@ -1,5 +1,5 @@
 /* =========================================================
-   SRM Enterprise Approval Platform: Front-End Prototype
+   Easy Approve: Front-End Prototype
    Vanilla JavaScript (ES6+). LocalStorage-backed state.
 
    Sections:
@@ -2214,7 +2214,7 @@
       hideActionDropdown();
       location.hash = '';
       route();
-      toast('Signed out from SRM Approval Cloud.');
+      toast('Signed out from Easy Approve.');
     },
     'toggle-sidebar'() { $('#sidebar').classList.add('open'); $('#sidebar-backdrop').classList.remove('hidden'); },
     'close-sidebar'() { closeSidebar(); },
