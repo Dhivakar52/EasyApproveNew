@@ -586,24 +586,28 @@ body {
   border-color: #F87171;
 }
 
-.btn.btn-amber {
-  background: #D97706;
+.btn.btn-amber,
+.btn.btn-orange {
+  background: #ea580c;
   color: #fff;
-  border-color: #D97706;
+  border-color: #ea580c;
 }
 
-.btn.btn-amber:hover {
-  background: #B45309;
+.btn.btn-amber:hover,
+.btn.btn-orange:hover {
+  background: #c2410c;
 }
 
-.btn.btn-indigo {
-  background: #4F46E5;
+.btn.btn-indigo,
+.btn.btn-purple {
+  background: #7c3aed;
   color: #fff;
-  border-color: #4F46E5;
+  border-color: #7c3aed;
 }
 
-.btn.btn-indigo:hover {
-  background: #4338CA;
+.btn.btn-indigo:hover,
+.btn.btn-purple:hover {
+  background: #6d28d9;
 }
 
 .btn.btn-sidebar {
@@ -1182,3 +1186,61 @@ textarea.form-control {
   .toast { max-width: none; }
   .drawer-panel { max-width: 100%; }
 }
+
+/* ---------- Version Strikethrough & Audit Styles ---------- */
+.badge-draft { background: #F1F5F9; color: #475569; }
+.diff-old {
+  text-decoration: line-through;
+  color: #DC2626;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.8125rem;
+}
+.diff-new {
+  color: #15803D;
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.badge-old {
+  display: inline-block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: #F1F5F9;
+  color: #64748B;
+  border: 1px solid #E2E8F0;
+}
+.badge-new {
+  display: inline-block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+}
+.email-sim-box {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.email-sim-header {
+  background: #0F172A;
+  color: #FFFFFF;
+  padding: 1.25rem 1.5rem;
+}
+

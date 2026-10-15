@@ -106,7 +106,7 @@
             <div class="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md">
               <i class="fa-solid fa-timeline text-indigo-400 text-lg mb-2 block"></i>
               <h4 class="text-sm font-semibold text-white">Audited History</h4>
-              <p class="text-xs text-slate-300 mt-1">Strikethrough revision tracking and tamper-proof decision logs.</p>
+              <p class="text-xs text-slate-300 mt-1">Lifecycle revision tracking and tamper-proof decision logs.</p>
             </div>
           </div>
         </div>
@@ -114,8 +114,7 @@
         <div
           class="relative z-10 pt-8 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
           <span>&copy; 2026 SRM Technologies. All rights reserved.</span>
-          <span class="flex items-center gap-1.5"><span
-              class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Client Sandbox Ready</span>
+
         </div>
       </div>
 
@@ -206,7 +205,8 @@
           <div id="login-otp-panel" class="hidden">
             <div class="mb-6 flex items-center justify-between">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-lg">
+                <div
+                  class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center text-lg">
                   <i class="fa-solid fa-shield-halved"></i>
                 </div>
                 <div>
@@ -214,7 +214,8 @@
                   <p class="text-xs text-slate-500 mt-0.5">Two-Factor Security Sign-In</p>
                 </div>
               </div>
-              <span class="px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
+              <span
+                class="px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-1">
                 <i class="fa-solid fa-circle-check text-[10px]"></i> Step 2/2
               </span>
             </div>
@@ -233,18 +234,21 @@
             </div>
 
             <!-- Testing Prototype Notice -->
-            <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200/80 mb-4 flex items-center justify-between text-xs text-amber-900">
+            <div
+              class="p-2.5 rounded-lg bg-amber-50 border border-amber-200/80 mb-4 flex items-center justify-between text-xs text-amber-900">
               <span class="flex items-center gap-1.5 font-medium">
                 <i class="fa-solid fa-key text-amber-600"></i> Testing OTP:
               </span>
-              <span class="font-mono font-bold bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-800 tracking-wider">1111</span>
+              <span
+                class="font-mono font-bold bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-800 tracking-wider">1111</span>
             </div>
 
             <div id="otp-error" class="alert alert-error mb-4 hidden" role="alert"></div>
 
             <form id="otp-form" class="space-y-4" novalidate>
               <div>
-                <label for="login-otp" class="lbl text-center !mb-1.5">Enter 4-Digit Security Code <span class="req">*</span></label>
+                <label for="login-otp" class="lbl text-center !mb-1.5">Enter 4-Digit Security Code <span
+                    class="req">*</span></label>
                 <div class="relative">
                   <input id="login-otp" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4"
                     class="form-control text-center text-2xl font-mono tracking-[0.6em] font-bold py-3 bg-slate-50/50 focus:bg-white transition-all"
@@ -253,7 +257,8 @@
                 </div>
                 <p class="text-center text-xs text-slate-400 mt-2">
                   Didn't receive code?
-                  <button type="button" class="text-blue-600 font-semibold hover:underline" data-action="resend-otp">Resend OTP</button>
+                  <button type="button" class="text-blue-600 font-semibold hover:underline"
+                    data-action="resend-otp">Resend OTP</button>
                 </p>
               </div>
 
@@ -350,9 +355,16 @@
 
           <!-- Notification Bell with Ping -->
           <button type="button" class="icon-btn relative hover:bg-slate-100 rounded-lg transition-colors"
-            data-action="go" data-page="notifications" aria-label="Notifications">
+            data-action="go" data-page="notifications" aria-label="Notifications" title="Notifications">
             <i class="fa-regular fa-bell text-slate-700 text-base"></i>
             <span id="bell-count" class="bell-count hidden">0</span>
+          </button>
+
+          <!-- Email Outbox & Notification Center -->
+          <button type="button" class="icon-btn relative hover:bg-slate-100 rounded-lg transition-colors"
+            data-action="open-email-outbox" aria-label="Email Delivery Outbox" title="View Sent Emails & Action Links">
+            <i class="fa-solid fa-paper-plane text-slate-700 text-sm"></i>
+            <span id="outbox-count" class="bell-count !bg-blue-600 hidden">0</span>
           </button>
 
           <!-- Demo Date Switcher Chip -->
