@@ -3387,6 +3387,33 @@
             `}
           </section>
 
+          <!-- Clarification Comments -->
+          ${(() => {
+            const clarifyEvents = (req.timeline || []).filter(x => x.action === 'Clarification Requested');
+            if (!clarifyEvents.length) return '';
+            return `
+            <section class="card card-pad">
+              <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <i class="fa-solid fa-comments text-orange-500"></i> Clarification Comments
+                </h2>
+                <span class="text-xs text-slate-500 font-semibold">${clarifyEvents.length} comment${clarifyEvents.length > 1 ? 's' : ''}</span>
+              </div>
+              <div class="space-y-3">
+                ${clarifyEvents.map(ev => `
+                  <div class="p-4 rounded-xl bg-slate-100 border border-slate-200" style="border-radius:12px;">
+                    <div class="flex items-center justify-between flex-wrap gap-1 mb-2">
+                      <span class="text-sm font-bold text-slate-800">${esc(ev.by)}</span>
+                      <span class="text-[11px] text-slate-400 font-mono">${fmtDateTime(ev.at)}</span>
+                    </div>
+                    <div class="text-sm text-slate-700 prewrap leading-relaxed break-words whitespace-pre-wrap">${esc(ev.note)}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </section>
+            `;
+          })()}
+
           <!-- Reassignment History if Delegated -->
           ${req.reassignments && req.reassignments.length ? `
             <section class="card card-pad">
