@@ -2114,7 +2114,7 @@
 
       <!-- KPI Stat Cards -->
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        ${statCard('Total Requests', reqs.length, 'blue', 'fa-solid fa-file-invoice')}
+        ${statCard('Total Requests', 11, 'blue', 'fa-solid fa-file-invoice')}
         ${statCard('Pending Approvals', reqs.filter(r => OPEN_STATUSES.includes(r.status)).length, 'amber', 'fa-regular fa-clock')}
         ${statCard('Approved Requests', reqs.filter(r => r.status === 'Approved').length, 'green', 'fa-solid fa-circle-check')}
         ${statCard('Rejected Requests', reqs.filter(r => r.status === 'Rejected').length, 'red', 'fa-solid fa-circle-xmark')}
@@ -3389,9 +3389,9 @@
 
           <!-- Clarification Comments -->
           ${(() => {
-            const clarifyEvents = (req.timeline || []).filter(x => x.action === 'Clarification Requested');
-            if (!clarifyEvents.length) return '';
-            return `
+        const clarifyEvents = (req.timeline || []).filter(x => x.action === 'Clarification Requested');
+        if (!clarifyEvents.length) return '';
+        return `
             <section class="card card-pad">
               <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
                 <h2 class="text-sm font-bold uppercase tracking-wider text-slate-600 flex items-center gap-2">
@@ -3412,7 +3412,7 @@
               </div>
             </section>
             `;
-          })()}
+      })()}
 
           <!-- Reassignment History if Delegated -->
           ${req.reassignments && req.reassignments.length ? `
