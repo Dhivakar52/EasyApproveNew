@@ -986,7 +986,7 @@
     apprFilters: { q: '', status: 'awaiting', type: '', page: 1 },
     userSearch: '',
     notifFilter: 'all',
-    drafts: { create: { stakeholders: [], files: [] }, modify: { stakeholders: [], files: [] } },
+    drafts: { create: { stakeholders: [], ccEmails: [], files: [] }, modify: { stakeholders: [], ccEmails: [], files: [] } },
     modal: null,
     route: { page: 'dashboard' },
     verifiedActionSessions: {}, // { [requestId]: { version: number, at: timestamp } }
@@ -1123,8 +1123,9 @@
 
   const involved = (r, u) => {
     const em = identityEmails(u.email);
-    return em.includes(r.requesterEmail) || em.includes(r.approverEmail) || em.includes(r.ccEmail) ||
-      r.stakeholders.some(s => em.includes(s)) || r.reassignments.some(x => em.includes(x.fromEmail));
+    const ccList = parseEmails(r.ccEmail || '');
+    return em.includes(r.requesterEmail) || em.includes(r.approverEmail) || ccList.some(c => em.includes(c)) ||
+      (r.stakeholders || []).some(s => em.includes(s)) || (r.reassignments || []).some(x => em.includes(x.fromEmail));
   };
   const canView = r => { const u = currentUser(); return !!u && (u.role === 'admin' || involved(r, u)); };
   const scopedRequests = () => { const u = currentUser(); return isAdmin() ? DB.requests.slice() : DB.requests.filter(r => involved(r, u)); };
@@ -1174,7 +1175,7 @@
     DB.requests.unshift(req);
     addTimeline(req, actor, 'Request submitted', 'Submitted into approval chain (Version 1). The request record is locked.');
 
-    // Dispatches submission notification email to approver, requester, and stakeholders
+    // Dispatches submission notification email to approver, requester, CC recipients, and stakeholders
     EmailService.sendEmail({
       to: req.approverEmail,
       cc: req.ccEmail,
@@ -1185,9 +1186,20 @@
 
     EmailService.sendEmail({
       to: req.requesterEmail,
+      cc: req.ccEmail,
       subject: 'Submission Confirmation: ' + req.title + ' (' + req.number + ')',
       template: 'submission',
       data: { request: req }
+    });
+
+    const ccList = parseEmails(req.ccEmail || '');
+    ccList.forEach(cc => {
+      EmailService.sendEmail({
+        to: cc,
+        subject: 'CC Notification: ' + req.title + ' (' + req.number + ')',
+        template: 'submission',
+        data: { request: req }
+      });
     });
 
     (req.stakeholders || []).forEach(st => {
@@ -1202,7 +1214,8 @@
     notifyRequest(req, 'submitted', e =>
       e === req.requesterEmail ? 'Approval request submitted: ' + req.title + ' (' + req.number + ').' :
         e === req.approverEmail ? 'New action required: ' + req.title + ' (' + req.number + ') from ' + req.requesterName + '. Deadline: ' + fmtDate(req.deadline) + '.' :
-          'You were added as a stakeholder on ' + req.number + ': ' + req.title + '.');
+          ccList.includes(e) ? 'You were marked CC on approval request ' + req.number + ': ' + req.title + '.' :
+            'You were added as a stakeholder on ' + req.number + ': ' + req.title + '.');
 
     persist();
     return req;
@@ -1329,9 +1342,20 @@
 
     EmailService.sendEmail({
       to: req.requesterEmail,
+      cc: req.ccEmail,
       subject: 'Resubmission Successful: ' + req.number + ' (v' + req.version + ')',
       template: 'resubmitted',
       data: { request: req }
+    });
+
+    const resubmitCcList = parseEmails(req.ccEmail || '');
+    resubmitCcList.forEach(cc => {
+      EmailService.sendEmail({
+        to: cc,
+        subject: 'CC Notification: ' + req.number + ' (v' + req.version + ') Resubmitted',
+        template: 'resubmitted',
+        data: { request: req }
+      });
     });
 
     notifyRequest(req, 'modified', e =>
@@ -1602,7 +1626,8 @@
   };
 
   function notifyRequest(req, type, fn, extraRecipients) {
-    const to = uniq([req.requesterEmail, req.approverEmail, req.ccEmail].concat(req.stakeholders, extraRecipients || []).filter(Boolean));
+    const ccList = parseEmails(req.ccEmail || '');
+    const to = uniq([req.requesterEmail, req.approverEmail].concat(ccList, req.stakeholders || [], extraRecipients || []).filter(Boolean));
     to.forEach(email => {
       const message = fn(email);
       if (!message) return;
@@ -2239,10 +2264,11 @@
     if (editReq) {
       state.drafts.create = {
         stakeholders: editReq.stakeholders ? editReq.stakeholders.slice() : [],
+        ccEmails: parseEmails(editReq.ccEmail || ''),
         files: editReq.attachments ? editReq.attachments.slice() : []
       };
     } else {
-      state.drafts.create = { stakeholders: [], files: [] };
+      state.drafts.create = { stakeholders: [], ccEmails: [], files: [] };
     }
 
     const initialGroup = editReq ? (editReq.group || findGroupForEmail(editReq.approverEmail)) : '';
@@ -2261,31 +2287,50 @@
       </div>
 
       <form id="req-form" class="space-y-6" novalidate ${editReq ? 'data-edit-id="' + editReq.id + '"' : ''}>
+        <!-- Hidden requester identity fields — auto-populated from authenticated session -->
+        <input type="hidden" id="f-requesterName" name="f-requesterName" value="${esc(editReq ? editReq.requesterName : u.name)}">
+        <input type="hidden" id="f-requesterEmail" name="f-requesterEmail" value="${esc(editReq ? editReq.requesterEmail : u.email)}">
         <!-- Single Card Layout -->
         <section class="card card-pad">
           <div class="grid gap-4 sm:grid-cols-2">
-            ${field('f-requesterName', 'Requester Full Name', inputCtl('f-requesterName', { value: editReq ? editReq.requesterName : u.name, attrs: 'disabled readonly' }), { required: true })}
-            ${field('f-requesterEmail', 'Official Requester Email', inputCtl('f-requesterEmail', { type: 'email', value: editReq ? editReq.requesterEmail : u.email, attrs: 'disabled readonly' }), { required: true })}
+           <!-- New Approver Group Field (for CC) -->
+            <div class="field ">
+              <label for="f-cc-group" class="lbl">Approver Group <span class="opt">Select group to view member emails</span></label>
+              <select id="f-cc-group" class="form-control">
+                <option value="">Select Group to View Member Emails</option>
+                ${GROUPS.map(g => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('')}
+              </select>
+              <p class="hint">Selecting an approver group populates the group member dropdown below.</p>
+              
+             
+            </div>
 
+             <!-- Group Member dropdown (shown when group selected) -->
+              <div id="f-cc-group-members" class="" style="display:block;"></div>
+
+            <!-- Emails CC with selected chips & direct entry -->
+            <div class="field sm:col-span-2">
+              <label for="f-cc-input" class="lbl">Emails CC <span class="opt">Optional</span></label>
+              <div id="f-cc-chips" class="chip-input-wrap"></div>
+              <input id="f-cc-input" type="text" class="form-control" placeholder="Type email and press Enter or select from group member dropdown above..." autocomplete="off">
+              <p class="hint">Selected CC recipients receive notifications and copies of approval status changes.</p>
+              <p class="err" data-err="f-cc" role="alert"></p>
+            </div>
             ${field('f-title', 'Request Title', inputCtl('f-title', { value: editReq ? editReq.title : '', ph: 'e.g. Developer Laptops for Q4 Engineering Onboarding' }), { required: true, span: true })}
             ${field('f-type', 'Approval Category', selectCtl('f-type', CONFIG.APPROVAL_TYPES, { value: editReq ? editReq.type : '', placeholder: 'Select approval category' }), { required: true })}
             ${field('f-amount', 'Expected Amount Including Taxes (INR)', inputCtl('f-amount', { value: editReq ? editReq.amount : '', type: 'number', attrs: 'min="0" step="any" inputmode="decimal"' }), { required: true, hint: '<span id="f-amount-preview" class="mono font-bold text-blue-600"></span>' })}
             ${field('f-budgeted', 'Is This Budgeted in FY Allocation?', selectCtl('f-budgeted', CONFIG.BUDGET_OPTIONS, { value: editReq ? editReq.budgeted : '', placeholder: 'Select option' }), { required: true })}
+           
             ${field('f-amountBudgeted', 'Allocated Budget Amount (INR)', inputCtl('f-amountBudgeted', { value: editReq ? (editReq.budgeted === 'No' ? '0' : editReq.amountBudgeted) : '', type: 'number', attrs: 'min="0" step="any" inputmode="decimal" readonly data-auto="1"' }), { required: true, wrapId: 'f-amountBudgeted-wrap', hidden: true, hint: 'Defaults to ₹ 0 if not budgeted.' })}
             ${field('f-extraReason', 'Reason for Extra Expense', textareaCtl('f-extraReason', { value: editReq ? (editReq.extraReason || '') : '', ph: 'Explain why the expense exceeds the allocated budget...', attrs: 'rows="3" style="min-height:4.5rem"' }), { required: true, wrapId: 'f-extraReason-wrap', hidden: true, span: true, hint: 'Mandatory when requested amount exceeds budgeted allocation.' })}
 
-              <div class="field sm:col-span-2">
-              <label for="f-stake-input" class="lbl">Additional  Emails <span class="opt">Optional</span></label>
-              <div id="f-stake-chips" class="chip-input-wrap"></div>
-              <input id="f-stake-input" type="text" class="form-control" placeholder="Type email and press Enter..." autocomplete="off">
-              <p class="hint">Stakeholders receive status notifications and can view this request.</p>
-              <p class="err" data-err="f-stake" role="alert"></p>
-            </div>
 
             ${field('f-group', 'Approver Group', selectCtl('f-group', GROUPS, { value: initialGroup, placeholder: 'Select Group' }), { required: true })}
             ${field('f-approverEmail', 'Approver Official Email', '<select id="f-approverEmail" name="f-approverEmail" class="form-control" disabled><option value="">Select Group First</option></select>', { required: true })}
             ${field('f-approverName', 'Approver Full Name', inputCtl('f-approverName', { value: editReq ? editReq.approverName : '', ph: 'Auto-populated based on email selection', attrs: 'disabled readonly' }), { required: true })}
             ${field('f-deadline', 'Deadline Date', inputCtl('f-deadline', { value: editReq ? editReq.deadline : '', type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true, hint: 'Minimum ' + CONFIG.MIN_DEADLINE_DAYS + ' business days required (earliest: ' + fmtDate(minDeadlineISO()) + ').' })}
+
+           
 
             ${field('f-details', 'Details of Request ', textareaCtl('f-details', { value: editReq ? editReq.details : '', ph: 'Provide specifications, quantities, scope of work, or change parameters...' }), { required: true, span: true })}
             ${field('f-reason', 'Reason For Requirement', textareaCtl('f-reason', { value: editReq ? editReq.reason : '', ph: 'Explain the operational or commercial necessity...', attrs: 'style="min-height:5rem"' }), { required: true, span: true })}
@@ -2327,11 +2372,9 @@
 
   function validateRequestData(v) {
     const e = {};
-    if (!v.requesterName || !String(v.requesterName).trim()) e.requesterName = 'Requester name is required.';
-
     const re = String(v.requesterEmail || '').trim().toLowerCase();
-    if (!re) e.requesterEmail = 'Requester email is required.';
-    else if (!isEmail(re)) e.requesterEmail = 'Enter a valid email address format.';
+    // requesterName and requesterEmail are sourced from the authenticated session;
+    // they are not validated as user-editable fields.
 
     if (!v.group) e.group = 'Select a Group.';
     else if (!GROUPS.includes(v.group)) e.group = 'Select a valid group from the list.';
@@ -2367,11 +2410,20 @@
     const form = $('#req-form');
     const editId = form ? form.dataset.editId : '';
     const editReq = editId ? findReq(editId) : null;
-    const u = currentUser(), g = id => ($('#' + id) ? $('#' + id).value.trim() : '');
-    const pending = addStakeholders('create', $('#f-stake-input') ? $('#f-stake-input').value : '');
+    const u = currentUser();
+    // Guard: authenticated session must be present before submission
+    if (!u || !u.name || !u.email) {
+      toast('Session unavailable. Please sign in again before submitting.', 'error');
+      return;
+    }
+    const g = id => ($('#' + id) ? $('#' + id).value.trim() : '');
+    const pendingCc = addCcEmails('create', $('#f-cc-input') ? $('#f-cc-input').value : '');
+    const ccEmailsList = (state.drafts.create && state.drafts.create.ccEmails) ? state.drafts.create.ccEmails.slice() : [];
+    const ccEmailStr = ccEmailsList.join(', ');
+
     const v = {
-      requesterName: g('f-requesterName') || u.name,
-      requesterEmail: (g('f-requesterEmail') || u.email).toLowerCase(),
+      requesterName: u.name,
+      requesterEmail: u.email.toLowerCase(),
       group: g('f-group'),
       approverEmail: g('f-approverEmail').toLowerCase(),
       approverName: g('f-approverName'),
@@ -2386,7 +2438,7 @@
       reason: g('f-reason')
     };
     const errs = validateRequestData(v);
-    if (!pending) errs.stake = 'Fix the stakeholder email above before submitting.';
+    if (!pendingCc) errs.cc = 'Fix the CC email address above before submitting.';
     showErrors('f-', errs);
     if (Object.keys(errs).length) return;
     const bud = v.budgeted === 'No' ? 0 : Number(v.amountBudgeted);
@@ -2407,6 +2459,10 @@
           changes[k] = newVal;
         }
       });
+      if (editReq.ccEmail !== ccEmailStr) {
+        changes.ccEmail = ccEmailStr;
+      }
+      editReq.ccEmail = ccEmailStr;
 
       const existingFileKeys = (editReq.attachments || []).map(f => f.name + '_' + f.size);
       const newFiles = d.files.filter(f => !existingFileKeys.includes(f.name + '_' + f.size));
@@ -2415,7 +2471,7 @@
       const ok = wfResubmit(editReq, changes, [], newFiles, 'Resubmitted with modifications via edit form', actorOf(u));
       if (!ok) return;
 
-      state.drafts.create = { stakeholders: [], files: [] };
+      state.drafts.create = { stakeholders: [], ccEmails: [], files: [] };
       go('request/' + editReq.id);
       toast('Request ' + editReq.number + ' resubmitted for sign-off (v' + editReq.version + ').', 'success');
       return;
@@ -2436,12 +2492,13 @@
       approverEmail: v.approverEmail,
       approverName: v.approverName,
       deadline: v.deadline,
-      stakeholders: d.stakeholders.slice(),
+      ccEmail: ccEmailStr,
+      stakeholders: [],
       details: v.details,
       reason: v.reason,
       attachments: d.files.slice()
     }, actorOf(u));
-    state.drafts.create = { stakeholders: [], files: [] };
+    state.drafts.create = { stakeholders: [], ccEmails: [], files: [] };
     state.navState = { page: 'my-requests', tab: 'all', q: '', page: 1 };
     go('my-requests');
     openModal({
@@ -2476,6 +2533,68 @@
     const slot = $('[data-err="' + p + '-stake"]'); if (slot) slot.textContent = errs.join(' ');
     const input = $('#' + p + '-stake-input'); if (input) input.value = errs.length ? text : '';
     renderChips(scope);
+    return errs.length === 0;
+  }
+
+  // --- CC Emails & Group Member Dropdown Handling ---
+  function renderCcChips() {
+    const box = $('#f-cc-chips'); if (!box) return;
+    const list = (state.drafts.create && state.drafts.create.ccEmails) || [];
+    box.innerHTML = list.map((e, i) =>
+      '<span class="chip font-mono text-xs bg-blue-50 border border-blue-200 text-blue-900 rounded-md py-1 px-2.5">' +
+      '<i class="fa-solid fa-at text-[10px] text-blue-500 mr-1.5"></i>' +
+      esc(e) +
+      '<button type="button" data-action="cc-chip-remove" data-i="' + i + '" class="ml-1.5 text-slate-400 hover:text-rose-600 focus:outline-none" aria-label="Remove ' + esc(e) + '">' +
+      '<i class="fa-solid fa-xmark text-[11px]"></i>' +
+      '</button>' +
+      '</span>'
+    ).join('');
+  }
+
+  function syncCcGroupMembers() {
+    const grpEl = $('#f-cc-group');
+    const container = $('#f-cc-group-members');
+    if (!grpEl || !container) return;
+    const groupName = grpEl.value;
+    if (!groupName) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+    const members = approversByGroup[groupName] || [];
+    if (!members.length) {
+      container.style.display = 'block';
+      container.innerHTML = '<p class="text-xs text-slate-500 italic py-1">No email addresses found for this group.</p>';
+      return;
+    }
+
+    container.style.display = 'block';
+    container.innerHTML = `
+      <label for="f-cc-member-select" class="lbl text-slate-700">
+        Group Member Email <span class="opt">(${esc(groupName)})</span>
+      </label>
+      <select id="f-cc-member-select" class="form-control">
+        <option value="">Select Member Email (${esc(groupName)})...</option>
+        ${members.map(m => '<option value="' + esc(m.email.toLowerCase()) + '">' + esc(m.name) + ' (' + esc(m.email) + ')</option>').join('')}
+      </select>
+      <p class="hint">Selecting a member adds their email directly into the Emails CC input.</p>
+    `;
+  }
+
+  function addCcEmails(scope, text) {
+    if (!text || !text.trim()) return true;
+    const d = state.drafts.create;
+    if (!d.ccEmails) d.ccEmails = [];
+    const errs = [];
+    parseEmails(text).forEach(e => {
+      if (!isEmail(e)) errs.push('"' + e + '" is not a valid email address.');
+      else if (!isApprovedEmail(e)) errs.push(e + ' must belong to an approved SRM domain (' + DOMAIN_TEXT + ').');
+      else if (!d.ccEmails.includes(e)) d.ccEmails.push(e);
+    });
+    const slot = $('[data-err="f-cc"]'); if (slot) slot.textContent = errs.join(' ');
+    const input = $('#f-cc-input');
+    if (input) input.value = errs.length ? text : d.ccEmails.join(', ');
+    renderCcChips();
     return errs.length === 0;
   }
   function renderFiles(scope) {
@@ -3091,14 +3210,7 @@
                 <span class="text-slate-500 font-medium block">CC Notification Email</span>
                 <span class="font-mono text-slate-700">${esc(req.ccEmail || 'None configured')}</span>
               </div>
-              <div>
-                <span class="text-slate-500 font-medium block mb-1">Additional Stakeholders</span>
-                ${req.stakeholders && req.stakeholders.length ? `
-                  <div class="flex flex-wrap gap-1">
-                    ${req.stakeholders.map(s => '<span class="chip !text-[11px] font-mono">' + esc(s) + '</span>').join('')}
-                  </div>
-                ` : '<span class="text-slate-400">None added</span>'}
-              </div>
+             
             </div>
           </section>
 
@@ -3115,7 +3227,7 @@
               <div class="min-w-0 flex-1">
                 <h3 class="text-sm font-bold text-slate-900">${esc(req.approverName)}</h3>
                 <p class="text-xs text-slate-600 font-mono break-all mt-0.5">${esc(req.approverEmail)}</p>
-                <p class="text-xs text-slate-500 mt-1">Sign-off Cutoff: <b class="text-slate-800 font-semibold">${fmtDate(req.deadline)}</b></p>
+                <p class="text-xs text-slate-500 mt-1">Deadline Date: <b class="text-slate-800 font-semibold">${fmtDate(req.deadline)}</b></p>
               </div>
             </div>
           </section>
@@ -3863,6 +3975,16 @@
     'mark-all-read'() { const ids = myNotifications().map(n => n.id); DB.notifications.forEach(n => { if (ids.includes(n.id)) n.read = true; }); persist(); route(); toast('All notifications marked as read.', 'success'); },
 
     'chip-remove'(el) { state.drafts[el.dataset.scope].stakeholders.splice(Number(el.dataset.i), 1); renderChips(el.dataset.scope); },
+    'cc-chip-remove'(el) {
+      if (state.drafts.create && state.drafts.create.ccEmails) {
+        state.drafts.create.ccEmails.splice(Number(el.dataset.i), 1);
+        const input = $('#f-cc-input');
+        if (input) {
+          input.value = state.drafts.create.ccEmails.join(', ');
+        }
+        renderCcChips();
+      }
+    },
     'file-remove'(el) { state.drafts[el.dataset.scope].files.splice(Number(el.dataset.i), 1); renderFiles(el.dataset.scope); },
 
     'user-add'() { if (isAdmin()) userModal(null); },
@@ -3970,6 +4092,25 @@
     const t = e.target;
     if (t.id === 'f-group') syncGroupApprovers();
     if (t.id === 'f-approverEmail') syncApproverName();
+    if (t.id === 'f-cc-group') syncCcGroupMembers();
+    if (t.id === 'f-cc-member-select' && t.value) {
+      const email = t.value.toLowerCase().trim();
+      const d = state.drafts.create;
+      if (!d.ccEmails) d.ccEmails = [];
+      if (!d.ccEmails.includes(email)) {
+        d.ccEmails.push(email);
+      }
+      const input = $('#f-cc-input');
+      if (input) {
+        input.value = d.ccEmails.join(', ');
+      }
+      renderCcChips();
+      t.value = '';
+      toast('Added ' + email + ' to Emails CC.', 'success');
+    }
+    if (t.id === 'f-cc-input' && t.value.trim()) {
+      addCcEmails('create', t.value);
+    }
     if (t.id === 'f-budgeted') syncBudget();
     if (t.id === 'f-file-input') { addFiles('create', t.files); t.value = ''; }
     if (t.id === 'm-file-input') { addFiles('modify', t.files); t.value = ''; }
@@ -4001,6 +4142,9 @@
     const t = e.target;
     if (t && (t.id === 'f-stake-input' || t.id === 'm-stake-input') && (e.key === 'Enter' || e.key === ',' || e.key === ';')) {
       e.preventDefault(); addStakeholders(t.id === 'f-stake-input' ? 'create' : 'modify', t.value);
+    }
+    if (t && t.id === 'f-cc-input' && (e.key === 'Enter' || e.key === ',' || e.key === ';')) {
+      e.preventDefault(); addCcEmails('create', t.value);
     }
   });
 
@@ -4223,8 +4367,14 @@
       const editReq = r.id ? findReq(r.id) : null;
       syncBudget();
       renderChips('create');
+      renderCcChips();
       renderFiles('create');
       syncGroupApprovers(editReq ? editReq.approverEmail : '');
+      syncCcGroupMembers();
+      const input = $('#f-cc-input');
+      if (input && state.drafts.create && state.drafts.create.ccEmails && state.drafts.create.ccEmails.length) {
+        input.value = state.drafts.create.ccEmails.join(', ');
+      }
       const amtEl = $('#f-amount');
       const prevEl = $('#f-amount-preview');
       if (amtEl && prevEl && amtEl.value) {
