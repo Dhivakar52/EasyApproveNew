@@ -2160,26 +2160,7 @@
       </section>
 
       <!-- Demo Simulator Utilities -->
-      <section class="card p-5 mt-6 bg-slate-50/50 border-dashed">
-        <div class="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-              <i class="fa-solid fa-clock-rotate-left text-blue-600"></i> Interactive Demo Sandbox Controls
-            </h4>
-            <p class="text-xs text-slate-500 mt-0.5">Test overdue logic, auto-escalations, and simulate calendar progression.</p>
-          </div>
-          <span class="font-mono text-xs font-bold px-2.5 py-1 rounded bg-white border border-slate-200">
-            System Date: ${fmtDate(todayISO())} ${DB.settings.dayOffset ? '(+' + DB.settings.dayOffset + 'd)' : ''}
-          </span>
-        </div>
-        <div class="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" class="btn btn-sm btn-outline !text-xs" data-action="demo-advance" data-n="1"><i class="fa-solid fa-forward-step mr-1"></i> +1 Day</button>
-          <button type="button" class="btn btn-sm btn-outline !text-xs" data-action="demo-advance" data-n="2"><i class="fa-solid fa-forward mr-1"></i> +2 Days</button>
-          <button type="button" class="btn btn-sm btn-outline !text-xs" data-action="demo-reset-date"><i class="fa-solid fa-rotate-left mr-1"></i> Reset Date</button>
-          <button type="button" class="btn btn-sm btn-primary !text-xs" data-action="demo-check"><i class="fa-solid fa-shield-halved mr-1"></i> Run Deadline Auditor</button>
-          <button type="button" class="btn btn-sm btn-danger-outline !text-xs ml-auto" data-action="demo-reset-data"><i class="fa-solid fa-trash-can mr-1"></i> Reset Sample Data</button>
-        </div>
-      </section>
+     
     `;
   }
 
@@ -2314,6 +2295,7 @@
     }
 
     const initialGroup = editReq ? (editReq.group || findGroupForEmail(editReq.approverEmail)) : '';
+    const initialDeadline = (editReq && editReq.deadline && editReq.deadline >= minDeadlineISO()) ? editReq.deadline : minDeadlineISO();
 
     return `
       <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -2361,8 +2343,9 @@
           <!-- Row 3 – Full width: Emails CC -->
           <div class="field">
             <label for="f-cc-input" class="lbl">Emails CC <span class="opt">Optional</span></label>
+            <div>
             <div id="f-cc-chips" class="chip-input-wrap"></div>
-            <input id="f-cc-input" type="text" class="form-control" placeholder="Type email and press Enter or select from group member dropdown above..." autocomplete="off">
+           </div>
             <p class="err" data-err="f-cc" role="alert"></p>
           </div>
 
@@ -2385,7 +2368,7 @@
           <!-- Row 8 – Two columns: Allocated Budget Amount (INR) | Deadline Date -->
           <div class="grid gap-4 sm:grid-cols-2">
             ${field('f-amountBudgeted', 'Allocated Budget Amount (INR)', inputCtl('f-amountBudgeted', { value: editReq ? (editReq.budgeted === 'No' ? '0' : editReq.amountBudgeted) : '', type: 'number', attrs: 'min="0" step="any" inputmode="decimal" data-auto="1"' }), { required: true, wrapId: 'f-amountBudgeted-wrap', hint: 'Defaults to ₹ 0 if not budgeted.' })}
-            ${field('f-deadline', 'Deadline Date', inputCtl('f-deadline', { value: editReq ? editReq.deadline : '', type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true, hint: 'Minimum ' + CONFIG.MIN_DEADLINE_DAYS + ' business days required (earliest: ' + fmtDate(minDeadlineISO()) + ').' })}
+            ${field('f-deadline', 'Deadline Date', inputCtl('f-deadline', { value: initialDeadline, type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true, hint: 'Minimum ' + CONFIG.MIN_DEADLINE_DAYS + ' business days required (earliest: ' + fmtDate(minDeadlineISO()) + ').' })}
           </div>
 
           <!-- Row 9 – Full width: Reason for Extra Expense -->
@@ -3698,7 +3681,7 @@
   function confirmWithReason(o) {
     openModal({
       title: o.title, confirmText: o.confirmText, btnClass: o.btnClass,
-      body: (o.intro ? '<p class="text-xs text-slate-500 mb-2">' + o.intro + '</p>' : '') + (o.extra || '') + modalReason(o.label, o.ph),
+      body: (o.intro ? '<p class="text-xs text-slate-500 mb-2">' + o.intro + '</p>' : '') + modalReason(o.label, o.ph) + (o.extra || ''),
       onSubmit: fd => {
         const reason = String(fd.get('m-reason') || '').trim();
         if (!reason) { showErrors('m-', { reason: o.error }); return o.error; }
@@ -3905,7 +3888,7 @@
     const fileCtl = '<div class="field"><label for="m-files" class="lbl">Supporting Documentation <span class="opt">Multiple Files Allowed</span></label><input id="m-files" name="m-files" type="file" class="form-control" multiple><p class="hint">Allowed: PDF, DOCX, XLSX, Images up to 10MB each.</p></div>';
     confirmWithReason({
       title: 'Reject Request', confirmText: 'Confirm Rejection', btnClass: 'btn-danger',
-      label: 'Mandatory Reason for Rejection', error: 'Please provide a clear rejection reason.', extra: fileCtl,
+      label: 'Reason for Rejection', error: 'Please provide a clear rejection reason.', extra: fileCtl,
       intro: esc(req.number) + ' · ' + esc(req.title) + ' (Revision v' + req.version + ')', ph: 'Specify why this request cannot be approved at this time...',
       run: (reason, fd) => {
         const rawFiles = fd.getAll('m-files') || [];
@@ -4022,14 +4005,16 @@
       return;
     }
 
+    const initialReassignDeadline = (req.deadline && req.deadline >= minDeadlineISO()) ? req.deadline : minDeadlineISO();
+
     openModal({
       title: 'Re-assign to Other Approver (Max 2 Allowed)', confirmText: 'Confirm Reassignment', btnClass: 'btn-purple',
       body: '<p class="text-xs text-slate-500 mb-3">Re-route approval responsibility to another executive. The request reference receives an audit revision suffix (Used: <b>' + req.reassignCount + ' of ' + CONFIG.MAX_REASSIGN + '</b> delegations).</p>' +
         field('r-group', 'Approver Group', selectCtl('r-group', GROUPS, { placeholder: 'Select Group' }), { required: true }) +
         field('r-email', 'New Approver Official Email', '<select id="r-email" name="r-email" class="form-control" disabled><option value="">Select Group First</option></select>', { required: true }) +
         field('r-name', 'New Approver Full Name', inputCtl('r-name', { ph: 'Auto-populated based on email selection', attrs: 'readonly disabled' }), { required: true }) +
-        field('r-deadline', 'Revised Approval Cutoff Date', inputCtl('r-deadline', { type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true }) +
-        field('r-reason', 'Mandatory Reassignment Reason', textareaCtl('r-reason', { ph: 'State reason for delegation (e.g. out of office, budget threshold escalation)...' }), { required: true }),
+        field('r-deadline', 'Revised Approval Cutoff Date', inputCtl('r-deadline', { value: initialReassignDeadline, type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true, hint: 'Minimum ' + CONFIG.MIN_DEADLINE_DAYS + ' business days required (earliest: ' + fmtDate(minDeadlineISO()) + ').' }) +
+        field('r-reason', 'Reassignment Reason', textareaCtl('r-reason', { ph: 'State reason for delegation (e.g. out of office, budget threshold escalation)...' }), { required: true }),
       onSubmit: fd => {
         const g = k => ($('#' + k) ? $('#' + k).value.trim() : String(fd.get(k) || '').trim());
         const errs = {};
@@ -4396,6 +4381,7 @@
     if (t.id === 'r-group') syncReassignGroupApprovers();
     if (t.id === 'r-email') syncReassignApproverName();
     if (t.id === 'f-amount' || t.id === 'f-amountBudgeted') {
+      if (t.id === 'f-amountBudgeted') t.dataset.auto = '0';
       syncBudget();
       if (t.id === 'f-amount') { const p = $('#f-amount-preview'); if (p) p.textContent = t.value !== '' && !isNaN(+t.value) ? fmtINR(t.value) : ''; }
     }
@@ -4714,6 +4700,10 @@
       const input = $('#f-cc-input');
       if (input && state.drafts.create && state.drafts.create.ccEmails && state.drafts.create.ccEmails.length) {
         input.value = state.drafts.create.ccEmails.join(', ');
+      }
+      const dlEl = $('#f-deadline');
+      if (dlEl && !dlEl.value) {
+        dlEl.value = (editReq && editReq.deadline && editReq.deadline >= minDeadlineISO()) ? editReq.deadline : minDeadlineISO();
       }
       const amtEl = $('#f-amount');
       const prevEl = $('#f-amount-preview');
