@@ -86,6 +86,10 @@
         email: "karthik.subramanian@srmtech.com"
       },
       {
+        name: "Demo User",
+        email: "user@srmtech.com"
+      },
+      {
         name: "Vignesh Raj",
         email: "vignesh.raj@srmtech.com"
       }
@@ -159,7 +163,7 @@
     'Under Modification': { cls: 'badge-modify', icon: 'fa-solid fa-pen-to-square', label: 'Modification Required' }
   };
 
-  const ADMIN_PAGES = ['users'];
+  const ADMIN_PAGES = ['users', 'profile-card', 'settings'];
   const PAGE_TITLES = {
     dashboard: 'Executive Dashboard',
     notifications: 'Notifications & Alerts',
@@ -167,6 +171,7 @@
     'my-requests': 'My Requests',
     approvals: 'Approval List',
     users: 'Groups & User Directory',
+    'profile-card': 'Admin Profile Card',
     profile: 'User Profile & Preferences',
     request: 'Request Details',
     modify: 'Modify Approval Request',
@@ -1527,12 +1532,14 @@
 
     req.reassignments.push({
       at: ts(), fromName: old.name, fromEmail: old.email,
-      toName: d.name, toEmail: d.email, reason: d.reason,
+      toName: d.name, toEmail: d.email, toGroup: d.group || '', reason: d.reason,
       oldNumber: oldNumber, newNumber: req.number, deadline: d.deadline
     });
 
     req.approverEmail = d.email;
     req.approverName = d.name;
+    if (d.group) req.group = d.group;
+    else if (findGroupForEmail(d.email)) req.group = findGroupForEmail(d.email);
     req.deadline = d.deadline;
     req.reminderSent = false;
     req.status = STATUS.PENDING;
@@ -1993,12 +2000,11 @@
      11. PAGES
      ======================================================= */
   const NAV = [
-    { key: 'dashboard', label: 'Dashboard', icon: 'fa-solid fa-table-columns' },
+    { key: 'dashboard', label: 'Dashboard', icon: 'fa-solid fa-table-columns', admin: true },
     { key: 'notifications', label: 'Notifications', icon: 'fa-solid fa-bell' },
     { key: 'create', label: 'Create Request', icon: 'fa-solid fa-circle-plus' },
     { key: 'my-requests', label: 'My Requests', icon: 'fa-solid fa-file-invoice' },
-    { key: 'approvals', label: 'Approval List', icon: 'fa-solid fa-list-check' },
-    { key: 'users', label: 'Groups & Users', icon: 'fa-solid fa-users-gear', admin: true }
+    { key: 'approvals', label: 'Approval List', icon: 'fa-solid fa-list-check' }
   ];
 
   function renderChrome(route) {
@@ -2007,13 +2013,49 @@
     const items = NAV.filter(n => !n.admin || u.role === 'admin');
     const unread = unreadCount();
 
-    $('#sidebar-nav').innerHTML = items.map(n =>
+    const isSettingsPage = route.page === 'users' || route.page === 'profile-card';
+    if (state.settingsMenuOpen === undefined) {
+      state.settingsMenuOpen = isSettingsPage;
+    } else if (isSettingsPage) {
+      state.settingsMenuOpen = true;
+    }
+
+    let navHtml = items.map(n =>
       '<button type="button" class="nav-link" data-action="go" data-page="' + n.key + '"' + (active === n.key ? ' aria-current="page"' : '') + '>' +
       '<i class="' + n.icon + ' text-base w-5 text-center"></i>' +
       '<span class="flex-1">' + n.label + '</span>' +
       (n.key === 'notifications' && unread ? '<span class="count">' + unread + '</span>' : '') +
       (n.key === 'approvals' && awaitingMine().length ? '<span class="count">' + awaitingMine().length + '</span>' : '') +
       '</button>').join('');
+
+    // Admin Settings Menu with expandable Submenus
+    if (u.role === 'admin') {
+      const isExpanded = !!state.settingsMenuOpen;
+      const isChildActive = active === 'users' || active === 'profile-card';
+      navHtml += `
+        <div class="settings-menu-group pt-1">
+          <button type="button" class="nav-link ${isChildActive && !isExpanded ? '!text-white !bg-white/10' : ''}" data-action="toggle-settings-menu" aria-expanded="${isExpanded}">
+            <i class="fa-solid fa-gear text-base w-5 text-center"></i>
+            <span class="flex-1">Settings</span>
+            <i class="fa-solid fa-chevron-${isExpanded ? 'down' : 'right'} text-[11px] text-slate-400"></i>
+          </button>
+          ${isExpanded ? `
+            <div class="settings-subnav space-y-1 mt-1 pl-4">
+              <button type="button" class="nav-sublink" data-action="go" data-page="users" ${active === 'users' ? 'aria-current="page"' : ''}>
+                <i class="fa-solid fa-users-gear text-xs w-4 text-center"></i>
+                <span>Group &amp; Users</span>
+              </button>
+              <button type="button" class="nav-sublink" data-action="go" data-page="profile-card" ${active === 'profile-card' ? 'aria-current="page"' : ''}>
+                <i class="fa-solid fa-id-card text-xs w-4 text-center"></i>
+                <span>Profile Card</span>
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    $('#sidebar-nav').innerHTML = navHtml;
 
     $('#sidebar-user-name').textContent = u.name;
     $('#sidebar-user-email').textContent = u.email;
@@ -2291,57 +2333,71 @@
         <input type="hidden" id="f-requesterName" name="f-requesterName" value="${esc(editReq ? editReq.requesterName : u.name)}">
         <input type="hidden" id="f-requesterEmail" name="f-requesterEmail" value="${esc(editReq ? editReq.requesterEmail : u.email)}">
         <!-- Single Card Layout -->
-        <section class="card card-pad">
+        <section class="card card-pad space-y-4">
+          <!-- Row 1 – Three columns: SRM Group Approver | SRM Group Member Email | Approver Full Name -->
+          <div class="grid gap-4 sm:grid-cols-3">
+            ${field('f-group', 'SRM Group Approver', selectCtl('f-group', GROUPS, { value: initialGroup, placeholder: 'Select Group' }), { required: true })}
+            ${field('f-approverEmail', 'SRM Group Member Email', '<select id="f-approverEmail" name="f-approverEmail" class="form-control" disabled><option value="">Select Group First</option></select>', { required: true })}
+            ${field('f-approverName', 'Approver Full Name', inputCtl('f-approverName', { value: editReq ? editReq.approverName : '', ph: 'Auto-populated based on email selection', attrs: 'disabled readonly' }), { required: true })}
+          </div>
+
+          <!-- Row 2 – Two columns: SRM Group Mail for CC | SRM Group Member Email for CC (SRM University) -->
           <div class="grid gap-4 sm:grid-cols-2">
-           <!-- New Approver Group Field (for CC) -->
-            <div class="field ">
-              <label for="f-cc-group" class="lbl">Approver Group <span class="opt">Select group to view member emails</span></label>
+            <div class="field">
+              <label for="f-cc-group" class="lbl">SRM Group Mail for CC</label>
               <select id="f-cc-group" class="form-control">
-                <option value="">Select Group to View Member Emails</option>
+                <option value="">Select Group</option>
                 ${GROUPS.map(g => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('')}
               </select>
-              <p class="hint">Selecting an approver group populates the group member dropdown below.</p>
-              
-             
             </div>
-
-             <!-- Group Member dropdown (shown when group selected) -->
-              <div id="f-cc-group-members" class="" style="display:block;"></div>
-
-            <!-- Emails CC with selected chips & direct entry -->
-            <div class="field sm:col-span-2">
-              <label for="f-cc-input" class="lbl">Emails CC <span class="opt">Optional</span></label>
-              <div id="f-cc-chips" class="chip-input-wrap"></div>
-              <input id="f-cc-input" type="text" class="form-control" placeholder="Type email and press Enter or select from group member dropdown above..." autocomplete="off">
-              <p class="hint">Selected CC recipients receive notifications and copies of approval status changes.</p>
-              <p class="err" data-err="f-cc" role="alert"></p>
+            <div id="f-cc-group-members" class="field">
+              <label for="f-cc-member-select" class="lbl">SRM Group Member Email for CC (SRM University)</label>
+              <select id="f-cc-member-select" class="form-control" disabled>
+                <option value="">Select Group First</option>
+              </select>
             </div>
-            ${field('f-title', 'Request Title', inputCtl('f-title', { value: editReq ? editReq.title : '', ph: 'e.g. Developer Laptops for Q4 Engineering Onboarding' }), { required: true, span: true })}
+          </div>
+
+          <!-- Row 3 – Full width: Emails CC -->
+          <div class="field">
+            <label for="f-cc-input" class="lbl">Emails CC <span class="opt">Optional</span></label>
+            <div id="f-cc-chips" class="chip-input-wrap"></div>
+            <input id="f-cc-input" type="text" class="form-control" placeholder="Type email and press Enter or select from group member dropdown above..." autocomplete="off">
+            <p class="err" data-err="f-cc" role="alert"></p>
+          </div>
+
+          <!-- Row 4 – Full width: Request Title -->
+          ${field('f-title', 'Request Title', inputCtl('f-title', { value: editReq ? editReq.title : '', ph: 'e.g. Developer Laptops for Q4 Engineering Onboarding' }), { required: true })}
+
+          <!-- Row 5 – Full width: Details of Request -->
+          ${field('f-details', 'Details of Request', textareaCtl('f-details', { value: editReq ? editReq.details : '', ph: 'Provide specifications, quantities, scope of work, or change parameters...' }), { required: true })}
+
+          <!-- Row 6 – Full width: Reason For Requirement -->
+          ${field('f-reason', 'Reason For Requirement', textareaCtl('f-reason', { value: editReq ? editReq.reason : '', ph: 'Explain the operational or commercial necessity...', attrs: 'style="min-height:5rem"' }), { required: true })}
+
+          <!-- Row 7 – Three columns: Approval Category | Expected Amount Including Taxes (INR) | Is This Budgeted in FY Allocation? -->
+          <div class="grid gap-4 sm:grid-cols-3">
             ${field('f-type', 'Approval Category', selectCtl('f-type', CONFIG.APPROVAL_TYPES, { value: editReq ? editReq.type : '', placeholder: 'Select approval category' }), { required: true })}
             ${field('f-amount', 'Expected Amount Including Taxes (INR)', inputCtl('f-amount', { value: editReq ? editReq.amount : '', type: 'number', attrs: 'min="0" step="any" inputmode="decimal"' }), { required: true, hint: '<span id="f-amount-preview" class="mono font-bold text-blue-600"></span>' })}
             ${field('f-budgeted', 'Is This Budgeted in FY Allocation?', selectCtl('f-budgeted', CONFIG.BUDGET_OPTIONS, { value: editReq ? editReq.budgeted : '', placeholder: 'Select option' }), { required: true })}
-           
-            ${field('f-amountBudgeted', 'Allocated Budget Amount (INR)', inputCtl('f-amountBudgeted', { value: editReq ? (editReq.budgeted === 'No' ? '0' : editReq.amountBudgeted) : '', type: 'number', attrs: 'min="0" step="any" inputmode="decimal" readonly data-auto="1"' }), { required: true, wrapId: 'f-amountBudgeted-wrap', hidden: true, hint: 'Defaults to ₹ 0 if not budgeted.' })}
-            ${field('f-extraReason', 'Reason for Extra Expense', textareaCtl('f-extraReason', { value: editReq ? (editReq.extraReason || '') : '', ph: 'Explain why the expense exceeds the allocated budget...', attrs: 'rows="3" style="min-height:4.5rem"' }), { required: true, wrapId: 'f-extraReason-wrap', hidden: true, span: true, hint: 'Mandatory when requested amount exceeds budgeted allocation.' })}
+          </div>
 
-
-            ${field('f-group', 'Approver Group', selectCtl('f-group', GROUPS, { value: initialGroup, placeholder: 'Select Group' }), { required: true })}
-            ${field('f-approverEmail', 'Approver Official Email', '<select id="f-approverEmail" name="f-approverEmail" class="form-control" disabled><option value="">Select Group First</option></select>', { required: true })}
-            ${field('f-approverName', 'Approver Full Name', inputCtl('f-approverName', { value: editReq ? editReq.approverName : '', ph: 'Auto-populated based on email selection', attrs: 'disabled readonly' }), { required: true })}
+          <!-- Row 8 – Two columns: Allocated Budget Amount (INR) | Deadline Date -->
+          <div class="grid gap-4 sm:grid-cols-2">
+            ${field('f-amountBudgeted', 'Allocated Budget Amount (INR)', inputCtl('f-amountBudgeted', { value: editReq ? (editReq.budgeted === 'No' ? '0' : editReq.amountBudgeted) : '', type: 'number', attrs: 'min="0" step="any" inputmode="decimal" data-auto="1"' }), { required: true, wrapId: 'f-amountBudgeted-wrap', hint: 'Defaults to ₹ 0 if not budgeted.' })}
             ${field('f-deadline', 'Deadline Date', inputCtl('f-deadline', { value: editReq ? editReq.deadline : '', type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true, hint: 'Minimum ' + CONFIG.MIN_DEADLINE_DAYS + ' business days required (earliest: ' + fmtDate(minDeadlineISO()) + ').' })}
+          </div>
 
-           
+          <!-- Row 9 – Full width: Reason for Extra Expense -->
+          ${field('f-extraReason', 'Reason for Extra Expense', textareaCtl('f-extraReason', { value: editReq ? (editReq.extraReason || '') : '', ph: 'Explain why the expense exceeds the allocated budget...', attrs: 'rows="3" style="min-height:4.5rem"' }), { wrapId: 'f-extraReason-wrap', hidden: true, hint: 'Mandatory when requested amount exceeds budgeted allocation.' })}
 
-            ${field('f-details', 'Details of Request ', textareaCtl('f-details', { value: editReq ? editReq.details : '', ph: 'Provide specifications, quantities, scope of work, or change parameters...' }), { required: true, span: true })}
-            ${field('f-reason', 'Reason For Requirement', textareaCtl('f-reason', { value: editReq ? editReq.reason : '', ph: 'Explain the operational or commercial necessity...', attrs: 'style="min-height:5rem"' }), { required: true, span: true })}
-
-            <div class="field sm:col-span-2">
-              <label for="f-file-input" class="lbl">Supporting Files & Quotations <span class="opt">Optional, up to ${CONFIG.MAX_ATTACHMENTS} files</span></label>
-              <input id="f-file-input" type="file" class="form-control" multiple>
-              <p class="hint">Accepts PDF, Excel, Word, CSV, and image files up to 10 MB each.</p>
-              <div id="f-file-list" class="mt-2.5 grid gap-2"></div>
-              <p class="err" data-err="f-file" role="alert"></p>
-            </div>
+          <!-- Row 10 – Full width: Supporting Files & Quotations -->
+          <div class="field">
+            <label for="f-file-input" class="lbl">Supporting Files & Quotations <span class="opt">Optional, up to ${CONFIG.MAX_ATTACHMENTS} files</span></label>
+            <input id="f-file-input" type="file" class="form-control" multiple>
+            <p class="hint">Accepts PDF, Excel, Word, CSV, and image files up to 10 MB each.</p>
+            <div id="f-file-list" class="mt-2.5 grid gap-2"></div>
+            <p class="err" data-err="f-file" role="alert"></p>
           </div>
         </section>
 
@@ -2358,16 +2414,31 @@
   }
 
   function syncBudget() {
-    const b = $('#f-budgeted'); if (!b) return;
-    const bud = $('#f-amountBudgeted'), wrap = $('#f-amountBudgeted-wrap'), amt = parseFloat($('#f-amount').value);
-    if (!b.value) { wrap.hidden = true; }
-    else {
-      wrap.hidden = false;
-      if (b.value === 'No') { bud.value = '0'; bud.readOnly = true; bud.dataset.auto = '1'; }
-      else { bud.readOnly = false; if (bud.dataset.auto === '1') { bud.value = ''; bud.dataset.auto = '0'; } }
+    const b = $('#f-budgeted');
+    const bud = $('#f-amountBudgeted'), wrap = $('#f-amountBudgeted-wrap'), extraWrap = $('#f-extraReason-wrap');
+    if (wrap) wrap.hidden = false;
+    if (!b || !bud) return;
+    if (b.value === 'No') {
+      bud.value = '0';
+      bud.readOnly = true;
+      bud.dataset.auto = '1';
+    } else {
+      bud.readOnly = false;
+      if (bud.dataset.auto === '1') {
+        bud.value = '';
+        bud.dataset.auto = '0';
+      }
     }
+    const amt = parseFloat(($('#f-amount') && $('#f-amount').value) || '');
     const bv = bud.value === '' ? NaN : parseFloat(bud.value);
-    $('#f-extraReason-wrap').hidden = !(b.value && !isNaN(amt) && !isNaN(bv) && bv < amt);
+    const exceedsBudget = Boolean(b.value && !isNaN(amt) && !isNaN(bv) && bv < amt);
+    if (extraWrap) {
+      extraWrap.hidden = !exceedsBudget;
+      if (!exceedsBudget) {
+        const errEl = $('[data-err="f-extraReason"]');
+        if (errEl) errEl.textContent = '';
+      }
+    }
   }
 
   function validateRequestData(v) {
@@ -2556,28 +2627,39 @@
     const container = $('#f-cc-group-members');
     if (!grpEl || !container) return;
     const groupName = grpEl.value;
+    const dynamicGroup = groupName || 'SRM University';
     if (!groupName) {
-      container.style.display = 'none';
-      container.innerHTML = '';
+      container.innerHTML = `
+        <label for="f-cc-member-select" class="lbl">
+          SRM Group Member Email for CC (${esc(dynamicGroup)})
+        </label>
+        <select id="f-cc-member-select" class="form-control" disabled>
+          <option value="">Select Group First</option>
+        </select>
+      `;
       return;
     }
     const members = approversByGroup[groupName] || [];
     if (!members.length) {
-      container.style.display = 'block';
-      container.innerHTML = '<p class="text-xs text-slate-500 italic py-1">No email addresses found for this group.</p>';
+      container.innerHTML = `
+        <label for="f-cc-member-select" class="lbl">
+          SRM Group Member Email for CC (${esc(dynamicGroup)})
+        </label>
+        <select id="f-cc-member-select" class="form-control" disabled>
+          <option value="">No email addresses found for ${esc(dynamicGroup)}</option>
+        </select>
+      `;
       return;
     }
 
-    container.style.display = 'block';
     container.innerHTML = `
-      <label for="f-cc-member-select" class="lbl text-slate-700">
-        Group Member Email <span class="opt">(${esc(groupName)})</span>
+      <label for="f-cc-member-select" class="lbl">
+        SRM Group Member Email for CC (${esc(dynamicGroup)})
       </label>
       <select id="f-cc-member-select" class="form-control">
-        <option value="">Select Member Email (${esc(groupName)})...</option>
+        <option value="">Select Member Email (${esc(dynamicGroup)})...</option>
         ${members.map(m => '<option value="' + esc(m.email.toLowerCase()) + '">' + esc(m.name) + ' (' + esc(m.email) + ')</option>').join('')}
       </select>
-      <p class="hint">Selecting a member adds their email directly into the Emails CC input.</p>
     `;
   }
 
@@ -2837,6 +2919,177 @@
     if (Object.keys(errs).length) return;
     Object.assign(u, { name: g('p-name'), designation: g('p-designation'), vertical: g('p-vertical'), altEmail: alt });
     persist(); route(); toast('Profile details saved successfully.', 'success');
+  }
+
+  // --- Page: Admin Profile Card ---
+  function pageProfileCard() {
+    const u = currentUser();
+    const myApprovalsCount = DB.requests.filter(r => r.approverEmail === u.email).length;
+    const pendingActionCount = awaitingMine().length;
+    const totalRequestsCount = DB.requests.length;
+
+    return `
+      <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold text-[11px] px-2 py-0.5">
+              <i class="fa-solid fa-shield-halved mr-1"></i> Admin Privileges
+            </span>
+            <span class="text-xs text-slate-400 font-mono">ID: ${esc(u.id)}</span>
+          </div>
+          <h2 class="text-2xl font-bold tracking-tight text-slate-900">Enterprise Profile Card</h2>
+          <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Corporate credentials, administrative authority, and identity parameters.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" class="btn btn-outline !text-xs !py-2" data-action="go" data-page="users">
+            <i class="fa-solid fa-users-gear mr-1.5"></i> Manage Users
+          </button>
+          <button type="button" class="btn btn-primary !text-xs !py-2" data-action="go" data-page="profile">
+            <i class="fa-solid fa-pen mr-1.5"></i> Edit Profile Info
+          </button>
+        </div>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-12">
+        <!-- Main Identity Card (8 cols) -->
+        <div class="lg:col-span-8 space-y-6">
+          <div class="card overflow-hidden">
+            <!-- Top Banner -->
+            <div class="h-32 bg-gradient-to-r from-navy-800 via-blue-900 to-indigo-900 p-6 flex items-start justify-between relative overflow-hidden">
+              <div class="absolute -right-8 -bottom-8 w-44 h-44 bg-blue-500/20 rounded-full blur-2xl pointer-events-none"></div>
+              <div>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/10 text-white/90 border border-white/20 backdrop-blur-sm">
+                  <i class="fa-solid fa-check-circle text-emerald-400 text-[10px]"></i> Active Administrator
+                </span>
+              </div>
+              <span class="font-mono text-xs text-blue-200/70 tracking-wider">SRM Technologies Governance</span>
+            </div>
+
+            <!-- Avatar & Primary Info -->
+            <div class="px-6 pb-6 pt-0 relative">
+              <div class="flex flex-wrap items-end justify-between gap-4 -mt-12 mb-4">
+                <div class="relative">
+                  <div class="avatar !w-24 !h-24 !text-2xl font-extrabold bg-blue-600 text-white ring-4 ring-white shadow-lg">
+                    ${esc(initials(u.name))}
+                  </div>
+                  <span class="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Account"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="badge badge-approved text-xs px-2.5 py-1 font-semibold">
+                    <i class="fa-solid fa-lock text-[10px] mr-1"></i> Role: Administrator
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <h3 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                  <span>${esc(u.name)}</span>
+                  <i class="fa-solid fa-circle-check text-blue-600 text-sm" title="Verified Enterprise Identity"></i>
+                </h3>
+                <p class="text-sm font-medium text-slate-600 mt-0.5">${esc(u.designation || 'Enterprise Administrator')}</p>
+              </div>
+
+              <!-- Information Grid -->
+              <div class="grid gap-4 sm:grid-cols-2 mt-6 pt-6 border-t border-slate-100">
+                <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <span class="text-xs text-slate-500 font-medium block">Official Corporate Email</span>
+                  <span class="font-mono text-xs font-semibold text-slate-900 break-all">${esc(u.email)}</span>
+                </div>
+                <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <span class="text-xs text-slate-500 font-medium block">Secondary / Notification Email</span>
+                  <span class="font-mono text-xs font-semibold text-slate-900 break-all">${esc(u.altEmail || 'None configured')}</span>
+                </div>
+                <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <span class="text-xs text-slate-500 font-medium block">Organizational Vertical</span>
+                  <span class="text-xs font-semibold text-slate-900">${esc(u.vertical || 'Corporate Functions')}</span>
+                </div>
+                <div class="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <span class="text-xs text-slate-500 font-medium block">Account Authority &amp; Scope</span>
+                  <span class="text-xs font-semibold text-slate-900">Full System Administration &amp; Audit</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Administrative Capabilities Card -->
+          <div class="card card-pad">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 pb-3 border-b border-slate-100 mb-4 flex items-center gap-2">
+              <i class="fa-solid fa-key text-blue-600"></i> Assigned Administrative Authorities
+            </h3>
+            <div class="grid gap-3 sm:grid-cols-2 text-xs">
+              <div class="flex items-start gap-2.5 p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100">
+                <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                <div>
+                  <span class="font-bold text-slate-800 block">Groups &amp; Users Management</span>
+                  <span class="text-slate-500">Create, edit, and deactivate enterprise employees and groups.</span>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5 p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100">
+                <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                <div>
+                  <span class="font-bold text-slate-800 block">Cross-Vertical Approval Authority</span>
+                  <span class="text-slate-500">Authorized to sign off, reassign, or reject governance proposals.</span>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5 p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100">
+                <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                <div>
+                  <span class="font-bold text-slate-800 block">Full Audit &amp; Revision Log Access</span>
+                  <span class="text-slate-500">Inspect version histories, timeline events, and notification logs.</span>
+                </div>
+              </div>
+              <div class="flex items-start gap-2.5 p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100">
+                <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                <div>
+                  <span class="font-bold text-slate-800 block">Security &amp; Token Overrides</span>
+                  <span class="text-slate-500">Generate OTP bypass and revoke secure external action links.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar Summary Stats (4 cols) -->
+        <div class="lg:col-span-4 space-y-6">
+          <div class="card card-pad">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 pb-3 border-b border-slate-100 mb-3 flex items-center gap-2">
+              <i class="fa-solid fa-chart-pie text-indigo-600"></i> Governance Metrics
+            </h3>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+                <span class="text-xs text-slate-600 font-medium">Pending Approvals</span>
+                <span class="font-mono text-sm font-bold text-amber-600">${pendingActionCount}</span>
+              </div>
+              <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+                <span class="text-xs text-slate-600 font-medium">Requests Handled</span>
+                <span class="font-mono text-sm font-bold text-blue-600">${myApprovalsCount}</span>
+              </div>
+              <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+                <span class="text-xs text-slate-600 font-medium">Total System Records</span>
+                <span class="font-mono text-sm font-bold text-slate-900">${totalRequestsCount}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-pad">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 pb-3 border-b border-slate-100 mb-3 flex items-center gap-2">
+              <i class="fa-solid fa-sliders text-blue-600"></i> Quick Settings Navigation
+            </h3>
+            <div class="space-y-2">
+              <button type="button" class="btn btn-outline w-full justify-start !text-xs !py-2" data-action="go" data-page="users">
+                <i class="fa-solid fa-users-gear mr-2 text-slate-500"></i> Group &amp; Users Directory
+              </button>
+              <button type="button" class="btn btn-outline w-full justify-start !text-xs !py-2" data-action="go" data-page="profile">
+                <i class="fa-solid fa-user-pen mr-2 text-slate-500"></i> Profile Preferences
+              </button>
+              <button type="button" class="btn btn-outline w-full justify-start !text-xs !py-2" data-action="open-email-outbox">
+                <i class="fa-solid fa-paper-plane mr-2 text-slate-500"></i> Email Delivery Outbox
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // --- Requirement 2: Dedicated Request Details Page (Separate Full Screen) ---
@@ -3275,11 +3528,12 @@
               <button type="button" class="btn btn-orange shadow-sm" data-action="action-clarify" data-id="${req.id}">
                 <i class="fa-solid fa-circle-question mr-1.5"></i> Seek Clarification
               </button>
-              <button type="button" class="btn btn-danger shadow-sm" data-action="action-reject" data-id="${req.id}">
-                <i class="fa-solid fa-circle-xmark mr-1.5"></i> Reject Request
-              </button>
+          
               <button type="button" class="btn btn-purple shadow-sm" data-action="action-delegate" data-id="${req.id}" ${req.reassignCount >= CONFIG.MAX_REASSIGN ? 'disabled' : ''}>
                 <i class="fa-solid fa-user-gear mr-1.5"></i> Re-assign to Other Approver (${req.reassignCount || 0}/2)
+              </button>
+                <button type="button" class="btn btn-danger shadow-sm" data-action="action-reject" data-id="${req.id}">
+                <i class="fa-solid fa-circle-xmark mr-1.5"></i> Reject Request
               </button>
             </div>
           ` : `
@@ -3700,6 +3954,63 @@
     });
   }
 
+  function syncReassignGroupApprovers(selectedEmail) {
+    const groupEl = $('#r-group'), emailEl = $('#r-email'), nameEl = $('#r-name');
+    if (!groupEl || !emailEl || !nameEl) return;
+    const group = groupEl.value;
+    const approvers = approversByGroup[group] || [];
+
+    const errGroup = $('[data-err="r-group"]'); if (errGroup) errGroup.textContent = '';
+    const errEmail = $('[data-err="r-email"]'); if (errEmail) errEmail.textContent = '';
+    const errName = $('[data-err="r-name"]'); if (errName) errName.textContent = '';
+    const modalErr = $('#modal-error'); if (modalErr) modalErr.textContent = '';
+    groupEl.removeAttribute('aria-invalid');
+    emailEl.removeAttribute('aria-invalid');
+    nameEl.removeAttribute('aria-invalid');
+
+    if (!group || !approvers.length) {
+      emailEl.innerHTML = '<option value="">Select Group First</option>';
+      emailEl.disabled = true;
+      emailEl.value = '';
+      nameEl.value = '';
+    } else {
+      emailEl.disabled = false;
+      const targetEmail = selectedEmail || emailEl.value;
+      emailEl.innerHTML = '<option value="">Select Approver Email</option>' +
+        approvers.map(a => '<option value="' + esc(a.email) + '"' + (a.email.toLowerCase() === (targetEmail || '').toLowerCase() ? ' selected' : '') + '>' + esc(a.email) + '</option>').join('');
+      if (targetEmail) {
+        emailEl.value = targetEmail;
+        syncReassignApproverName();
+      } else {
+        emailEl.value = '';
+        nameEl.value = '';
+      }
+    }
+  }
+
+  function syncReassignApproverName() {
+    const groupEl = $('#r-group'), emailEl = $('#r-email'), nameEl = $('#r-name');
+    if (!groupEl || !emailEl || !nameEl) return;
+    const group = groupEl.value, email = emailEl.value;
+    const approvers = approversByGroup[group] || [];
+    const match = approvers.find(a => a.email.toLowerCase() === email.toLowerCase());
+
+    const errEmail = $('[data-err="r-email"]'); if (errEmail) errEmail.textContent = '';
+    const errName = $('[data-err="r-name"]'); if (errName) errName.textContent = '';
+    const modalErr = $('#modal-error'); if (modalErr) modalErr.textContent = '';
+    emailEl.removeAttribute('aria-invalid');
+    nameEl.removeAttribute('aria-invalid');
+
+    if (match) {
+      nameEl.value = match.name;
+    } else {
+      nameEl.value = '';
+      if (email) {
+        if (errName) errName.textContent = 'No matching approver record found for this email.';
+      }
+    }
+  }
+
   function doReassign(req) {
     if (!isActionOtpVerified(req)) {
       openApproverOtpModal(req, () => doReassign(req));
@@ -3714,26 +4025,39 @@
     openModal({
       title: 'Re-assign to Other Approver (Max 2 Allowed)', confirmText: 'Confirm Reassignment', btnClass: 'btn-purple',
       body: '<p class="text-xs text-slate-500 mb-3">Re-route approval responsibility to another executive. The request reference receives an audit revision suffix (Used: <b>' + req.reassignCount + ' of ' + CONFIG.MAX_REASSIGN + '</b> delegations).</p>' +
-        field('r-email', 'New Approver Official Email', inputCtl('r-email', { type: 'email', ph: 'new.approver@srmtech.com' }), { required: true, hint: 'Authorized domains: ' + esc(DOMAIN_TEXT) }) +
-        field('r-name', 'New Approver Full Name', inputCtl('r-name', { ph: 'e.g. Karthik Raman' }), { required: true }) +
+        field('r-group', 'Approver Group', selectCtl('r-group', GROUPS, { placeholder: 'Select Group' }), { required: true }) +
+        field('r-email', 'New Approver Official Email', '<select id="r-email" name="r-email" class="form-control" disabled><option value="">Select Group First</option></select>', { required: true }) +
+        field('r-name', 'New Approver Full Name', inputCtl('r-name', { ph: 'Auto-populated based on email selection', attrs: 'readonly disabled' }), { required: true }) +
         field('r-deadline', 'Revised Approval Cutoff Date', inputCtl('r-deadline', { type: 'date', attrs: 'min="' + minDeadlineISO() + '"' }), { required: true }) +
         field('r-reason', 'Mandatory Reassignment Reason', textareaCtl('r-reason', { ph: 'State reason for delegation (e.g. out of office, budget threshold escalation)...' }), { required: true }),
       onSubmit: fd => {
-        const g = k => String(fd.get(k) || '').trim(), errs = {}, email = g('r-email').toLowerCase();
+        const g = k => ($('#' + k) ? $('#' + k).value.trim() : String(fd.get(k) || '').trim());
+        const errs = {};
+        const group = g('r-group');
+        const email = g('r-email').toLowerCase();
+        const name = g('r-name');
+        const deadline = g('r-deadline');
+        const reason = g('r-reason');
+
         if (req.reassignCount >= CONFIG.MAX_REASSIGN) return 'Maximum delegation limit reached (' + CONFIG.MAX_REASSIGN + ').';
-        if (!isEmail(email)) errs.email = 'Enter a valid email address.';
-        else if (!isApprovedEmail(email)) errs.email = 'Must belong to an approved SRM domain (' + DOMAIN_TEXT + ').';
-        else if (email === req.approverEmail) errs.email = 'This request is already assigned to this approver.';
+        if (!group) errs.group = 'Please select an approver group.';
+        else if (!GROUPS.includes(group)) errs.group = 'Select a valid group from the list.';
+
+        const groupApprovers = approversByGroup[group] || [];
+        if (!email) errs.email = 'Please select an approver official email.';
+        else if (!groupApprovers.some(a => a.email.toLowerCase() === email)) errs.email = 'Selected email does not belong to the chosen group.';
+        else if (email === req.approverEmail.toLowerCase()) errs.email = 'This request is already assigned to this approver.';
         else if (identityEmails(req.requesterEmail).includes(email)) errs.email = 'The requester cannot be designated as their own approver.';
-        if (!g('r-name')) errs.name = 'Enter the new approver name.';
-        if (!g('r-deadline')) errs.deadline = 'Select a valid deadline.';
-        else if (g('r-deadline') < minDeadlineISO()) errs.deadline = 'Deadline must be at least ' + CONFIG.MIN_DEADLINE_DAYS + ' days ahead.';
-        if (!g('r-reason')) errs.reason = 'Enter a reassignment reason.';
+
+        if (!name) errs.name = 'Approver name must be populated.';
+        if (!deadline) errs.deadline = 'Select a valid deadline.';
+        else if (deadline < minDeadlineISO()) errs.deadline = 'Deadline must be at least ' + CONFIG.MIN_DEADLINE_DAYS + ' days ahead.';
+        if (!reason) errs.reason = 'Enter a reassignment reason.';
         if (Object.keys(errs).length) { showErrors('r-', errs); return 'Please resolve the highlighted fields.'; }
-        const ok = wfReassign(req, { email: email, name: g('r-name'), deadline: g('r-deadline'), reason: g('r-reason') }, me());
+        const ok = wfReassign(req, { group: group, email: email, name: name, deadline: deadline, reason: reason }, me());
         if (ok) {
           route();
-          toast('Approval delegated to ' + g('r-name') + ' (Reference: ' + req.number + ').', 'success');
+          toast('Approval delegated to ' + name + ' (Reference: ' + req.number + ').', 'success');
         }
       }
     });
@@ -3987,6 +4311,11 @@
     },
     'file-remove'(el) { state.drafts[el.dataset.scope].files.splice(Number(el.dataset.i), 1); renderFiles(el.dataset.scope); },
 
+    'toggle-settings-menu'() {
+      state.settingsMenuOpen = !state.settingsMenuOpen;
+      renderChrome(state.route || { page: 'dashboard' });
+    },
+
     'user-add'() { if (isAdmin()) userModal(null); },
     'user-edit'(el) { const u = DB.users.find(x => x.id === gid(el)); if (u && isAdmin()) userModal(u); },
     'user-toggle'(el) {
@@ -4064,6 +4393,8 @@
     if (t.id === 'login-otp' || t.id === 'appr-otp-input') {
       t.value = t.value.replace(/\D/g, '').slice(0, 4);
     }
+    if (t.id === 'r-group') syncReassignGroupApprovers();
+    if (t.id === 'r-email') syncReassignApproverName();
     if (t.id === 'f-amount' || t.id === 'f-amountBudgeted') {
       syncBudget();
       if (t.id === 'f-amount') { const p = $('#f-amount-preview'); if (p) p.textContent = t.value !== '' && !isNaN(+t.value) ? fmtINR(t.value) : ''; }
@@ -4092,6 +4423,8 @@
     const t = e.target;
     if (t.id === 'f-group') syncGroupApprovers();
     if (t.id === 'f-approverEmail') syncApproverName();
+    if (t.id === 'r-group') syncReassignGroupApprovers();
+    if (t.id === 'r-email') syncReassignApproverName();
     if (t.id === 'f-cc-group') syncCcGroupMembers();
     if (t.id === 'f-cc-member-select' && t.value) {
       const email = t.value.toLowerCase().trim();
@@ -4218,8 +4551,8 @@
     if (loginForm) loginForm.reset();
     showCredentialsScreen();
 
-    // Navigate to appropriate dashboard based on role (User or Admin)
-    location.hash = '#/dashboard';
+    // Navigate to appropriate landing page based on role (User or Admin)
+    location.hash = user.role === 'admin' ? '#/dashboard' : '#/my-requests';
     route();
     toast('Welcome back, ' + user.name + '.', 'success');
   }
@@ -4231,6 +4564,7 @@
     'my-requests': pageMyRequests,
     approvals: pageApprovals,
     users: pageUsers,
+    'profile-card': pageProfileCard,
     profile: pageProfile,
     request: pageRequest,
     modify: pageCreate
@@ -4247,8 +4581,10 @@
         if (k) query[decodeURIComponent(k)] = decodeURIComponent(v || '');
       });
     }
+    const u = currentUser();
+    const defaultPage = (u && u.role === 'admin') ? 'dashboard' : 'my-requests';
     return {
-      page: parts[0] || 'dashboard',
+      page: parts[0] || defaultPage,
       id: parts[1] || '',
       extra: parts[2] || '',
       query: query,
@@ -4354,10 +4690,14 @@
 
     if (ADMIN_PAGES.includes(r.page) && user.role !== 'admin') {
       toast('Access restricted: administrative privileges required.', 'error');
-      go('dashboard');
+      go('my-requests');
       return;
     }
-    if (!PAGES[r.page]) { go('dashboard'); return; }
+    if (r.page === 'dashboard' && user.role !== 'admin') {
+      go('my-requests');
+      return;
+    }
+    if (!PAGES[r.page]) { go(user.role === 'admin' ? 'dashboard' : 'my-requests'); return; }
 
     renderChrome(r);
     $('#page-container').innerHTML = PAGES[r.page](r);

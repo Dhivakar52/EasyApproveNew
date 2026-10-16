@@ -205,6 +205,36 @@ body {
   text-align: center;
 }
 
+.nav-sublink {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  margin-bottom: 0.15rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #94A3B8;
+  font-weight: 500;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nav-sublink:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+}
+
+.nav-sublink[aria-current="page"] {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.9) 0%, rgba(29, 78, 216, 0.9) 100%);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
 .nav-heading {
   padding: 1rem 0.85rem 0.4rem;
   color: #64748B;
